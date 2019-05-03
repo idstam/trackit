@@ -33,7 +33,7 @@ class Database extends \CodeIgniter\Database\Config
 		'DSN'      => '',
 		'hostname' => 'localhost',
 		'username' => 'trackit',
-		'password' => '',
+		'password' => getenv('TRACKIT_DB_USER'),
 		'database' => 'trackit',
 		'DBDriver' => 'MySQLi',
 		'DBPrefix' => '',
