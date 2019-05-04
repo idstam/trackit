@@ -14,7 +14,7 @@ class Migrations extends BaseConfig
 	| and disable it back when you're done.
 	|
 	*/
-	public $enabled = false;
+	public $enabled = true;
 
 	/*
 	|--------------------------------------------------------------------------
@@ -58,6 +58,6 @@ class Migrations extends BaseConfig
 	| be upgraded / downgraded to.
 	|
 	*/
-	public $currentVersion = 0;
+	public $currentVersion = 20190504085700;
 
 }

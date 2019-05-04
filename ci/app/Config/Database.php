@@ -32,9 +32,9 @@ class Database extends \CodeIgniter\Database\Config
 	public $default = [
 		'DSN'      => '',
 		'hostname' => 'localhost',
-		'username' => 'trackit',
-		'password' => getenv('TRACKIT_DB_USER'),
-		'database' => 'trackit',
+		'username' => '',
+		'password' => '',
+		'database' => '',
 		'DBDriver' => 'MySQLi',
 		'DBPrefix' => '',
 		'pConnect' => false,
@@ -50,7 +50,8 @@ class Database extends \CodeIgniter\Database\Config
 		'failover' => [],
 		'port'     => 3306,
 	];
-
+	
+	
 	/**
 	 * This database connection is used when
 	 * running PHPUnit database tests.
@@ -85,6 +86,7 @@ class Database extends \CodeIgniter\Database\Config
 	{
 		parent::__construct();
 
+		$default['password'] = getenv('TRACKIT_DB_USER');
 		// Ensure that we always set the database group to 'tests' if
 		// we are currently running an automated test suite, so that
 		// we don't overwrite live data on accident.
