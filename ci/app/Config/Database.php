@@ -32,9 +32,9 @@ class Database extends \CodeIgniter\Database\Config
 	public $default = [
 		'DSN'      => '',
 		'hostname' => 'localhost',
-		'username' => '',
+		'username' => 'trackit',
 		'password' => '',
-		'database' => '',
+		'database' => 'trackit',
 		'DBDriver' => 'MySQLi',
 		'DBPrefix' => '',
 		'pConnect' => false,
@@ -86,10 +86,12 @@ class Database extends \CodeIgniter\Database\Config
 	{
 		parent::__construct();
 
-		$default['password'] = getenv('TRACKIT_DB_USER');
 		// Ensure that we always set the database group to 'tests' if
 		// we are currently running an automated test suite, so that
 		// we don't overwrite live data on accident.
+		
+		$this->default['password'] = getenv('TRACKIT_DB_USER');
+
 		if (ENVIRONMENT === 'testing')
 		{
 			$this->defaultGroup = 'tests';
