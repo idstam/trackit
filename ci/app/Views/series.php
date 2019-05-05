@@ -4,6 +4,8 @@
 		<title>Welcome to TrackIt</title>
 
 		<link rel="shortcut icon" type="image/png" href="/favicon.ico"/>
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet">
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
 	</head>
 	<body>
 
@@ -99,11 +101,15 @@
 
 				<pre>
 				<code>
-					Your new data series: <?= $newUUID; ?>
+					Your series: <?= $series_id; ?>
 				</code>
 				</pre>
 
-				<p>The corresponding controller for this page is found at:</p>
+				<p>
+					<?php if(isset($stored_value)) :?>
+						Stored: <?= $stored_value; ?>
+					<?php endif ?>
+				</p>
 
 				<pre>
 				<code>

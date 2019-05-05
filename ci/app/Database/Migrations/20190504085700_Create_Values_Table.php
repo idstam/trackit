@@ -6,7 +6,6 @@ class Migration_Create_Values_Table extends \CodeIgniter\Database\Migration {
     $sql = "CREATE TABLE trackit.`values` (
 			value_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
 			series_id varchar(100) NOT NULL,
-			series_owner varchar(100) NOT NULL,
 			entered DATETIME NOT NULL,
 			value BIGINT NOT NULL
 		)
