@@ -4,7 +4,8 @@ class Migration_Create_Series_Table extends \CodeIgniter\Database\Migration {
 	{
     // First
     $sql = "CREATE TABLE trackit.series (
-		series_id varchar(100) NOT NULL PRIMARY KEY,
+		series_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+		series_name varchar(100) NOT NULL UNIQUE,
 		label varchar(200) NOT NULL,
 		series_owner varchar(100) NOT NULL
 	)

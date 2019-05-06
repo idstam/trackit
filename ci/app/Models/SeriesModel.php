@@ -7,7 +7,7 @@ class SeriesModel extends \CodeIgniter\Model
 
         protected $returnType = 'array';
 
-        protected $allowedFields = ['series_id', 'label', 'series_owner'];
+        protected $allowedFields = ['series_name', 'label', 'series_owner'];
 
 
             /**
@@ -19,16 +19,19 @@ class SeriesModel extends \CodeIgniter\Model
      * @param string $label
      * @param int   $values
      */
-    public function saveNewSeries($seriesID, $label, $owner)
+    public function saveNewSeries($seriesName, $label, $owner)
     {
-        $existingSerie = $this->find($seriesID);
+        $existingSerie = $this->find($seriesName);
 
         if(is_array($existingSerie) == 0)
         {
                 $seriesData['series_id'] = $seriesID;
                 $seriesData['label'] = $label;
                 $seriesData['series_owner'] =  $owner;
-                $this->insert($seriesData);
+                $seriesID = $this->insert($seriesData);
+        }
+        else{
+                $serieID = $existingSerie['series_id'];
         }
         return $seriesID;
     }

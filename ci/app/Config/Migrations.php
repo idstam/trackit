@@ -59,5 +59,6 @@ class Migrations extends BaseConfig
 	|
 	*/
 	public $currentVersion = 20190504085700;
+	
 
 }
