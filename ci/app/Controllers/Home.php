@@ -16,12 +16,12 @@ class Home extends BaseController
             return view('welcome_message', $data);
         }
 
-        $viewData['series_id'] = $params['s'];
+        $viewData['series_name'] = $params['s'];
 
         if (array_key_exists('v', $params) && array_key_exists('s', $params))  {
             $viewData['stored_value'] = $params['v'];
-            $seriesID = $seriesModel->saveNewSeries($params['s'], '', '');
-            $valuesModel->saveNewValue($seriesID, $params['v']);
+            $seriesID = $seriesModel->SaveNewSeries($params['s'], '', '');
+            $valuesModel->SaveNewValue($seriesID, $params['v']);
         }
         
         return view('series', $viewData);

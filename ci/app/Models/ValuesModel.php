@@ -18,7 +18,7 @@ class ValuesModel extends \CodeIgniter\Model
  * @param string $serieID
  * @param string $value
  */
-    public function saveNewValue($seriesID, $value)
+    public function SaveNewValue($seriesID, $value)
     {
         
         $bigIntVal = $value;

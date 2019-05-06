@@ -19,7 +19,7 @@ class SeriesModel extends \CodeIgniter\Model
      * @param string $label
      * @param int   $values
      */
-    public function saveNewSeries($seriesName, $label, $owner)
+    public function SaveNewSeries($seriesName, $label, $owner)
     {
         $existingSerie = $this->find($seriesName);
 
