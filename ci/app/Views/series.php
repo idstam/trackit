@@ -101,7 +101,7 @@
 
 				<pre>
 				<code>
-					Your series: <?= $series_id; ?>
+					Your series: <?= $series_name; ?>
 				</code>
 				</pre>
 
