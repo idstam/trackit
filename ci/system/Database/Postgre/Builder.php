@@ -7,6 +7,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +29,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -53,8 +54,41 @@ class Builder extends BaseBuilder
 	 */
 	protected $randomKeyword = [
 		'RANDOM()',
-		'RANDOM()',
 	];
+
+	/**
+	 * Specifies which sql statements
+	 * support the ignore option.
+	 *
+	 * @var array
+	 */
+	protected $supportedIgnoreStatements = [
+		'insert' => 'ON CONFLICT DO NOTHING',
+	];
+
+	//--------------------------------------------------------------------
+
+	/**
+	 * Compile Ignore Statement
+	 *
+	 * Checks if the ignore option is supported by
+	 * the Database Driver for the specific statement.
+	 *
+	 * @param string $statement
+	 *
+	 * @return string
+	 */
+	protected function compileIgnore(string $statement)
+	{
+		$sql = parent::compileIgnore($statement);
+
+		if (! empty($sql))
+		{
+			$sql = ' ' . trim($sql);
+		}
+
+		return $sql;
+	}
 
 	//--------------------------------------------------------------------
 
@@ -98,7 +132,9 @@ class Builder extends BaseBuilder
 	 * @param string  $column
 	 * @param integer $value
 	 *
-	 * @return boolean
+	 * @throws DatabaseException
+	 *
+	 * @return mixed
 	 */
 	public function increment(string $column, int $value = 1)
 	{
@@ -117,7 +153,9 @@ class Builder extends BaseBuilder
 	 * @param string  $column
 	 * @param integer $value
 	 *
-	 * @return boolean
+	 * @throws DatabaseException
+	 *
+	 * @return mixed
 	 */
 	public function decrement(string $column, int $value = 1)
 	{
@@ -138,14 +176,13 @@ class Builder extends BaseBuilder
 	 * we simply do a DELETE and an INSERT on the first key/value
 	 * combo, assuming that it's either the primary key or a unique key.
 	 *
-	 * @param array   $set       An associative array of insert values
-	 * @param boolean $returnSQL
+	 * @param array $set An associative array of insert values
 	 *
-	 * @return   boolean TRUE on success, FALSE on failure
+	 * @return   mixed
 	 * @throws   DatabaseException
 	 * @internal param true $bool returns the generated SQL, false executes the query.
 	 */
-	public function replace(array $set = null, bool $returnSQL = false)
+	public function replace(array $set = null)
 	{
 		if ($set !== null)
 		{
@@ -158,7 +195,9 @@ class Builder extends BaseBuilder
 			{
 				throw new DatabaseException('You must use the "set" method to update an entry.');
 			}
+			// @codeCoverageIgnoreStart
 			return false;
+			// @codeCoverageIgnoreEnd
 		}
 
 		$table = $this->QBFrom[0];
@@ -203,7 +242,6 @@ class Builder extends BaseBuilder
 	 * @param mixed   $where
 	 * @param integer $limit
 	 * @param boolean $reset_data
-	 * @param boolean $returnSQL
 	 *
 	 * @return   mixed
 	 * @throws   DatabaseException
@@ -211,14 +249,14 @@ class Builder extends BaseBuilder
 	 * @internal param the $mixed limit clause
 	 * @internal param $bool
 	 */
-	public function delete($where = '', int $limit = null, bool $reset_data = true, bool $returnSQL = false)
+	public function delete($where = '', int $limit = null, bool $reset_data = true)
 	{
 		if (! empty($limit) || ! empty($this->QBLimit))
 		{
 			throw new DatabaseException('PostgreSQL does not allow LIMITs on DELETE queries.');
 		}
 
-		return parent::delete($where, $limit, $reset_data, $returnSQL);
+		return parent::delete($where, $limit, $reset_data);
 	}
 
 	//--------------------------------------------------------------------
@@ -232,7 +270,7 @@ class Builder extends BaseBuilder
 	 *
 	 * @return string
 	 */
-	protected function _limit(string $sql): string
+	protected function _limit(string $sql, bool $offsetIgnore = false): string
 	{
 		return $sql . ' LIMIT ' . $this->QBLimit . ($this->QBOffset ? " OFFSET {$this->QBOffset}" : '');
 	}
@@ -279,7 +317,7 @@ class Builder extends BaseBuilder
 	protected function _updateBatch(string $table, array $values, string $index): string
 	{
 		$ids = [];
-		foreach ($values as $key => $val)
+		foreach ($values as $val)
 		{
 			$ids[] = $val[$index];
 
@@ -351,11 +389,11 @@ class Builder extends BaseBuilder
 	 *
 	 * @see https://www.postgresql.org/docs/9.2/static/functions-matching.html
 	 *
-	 * @param string    $prefix
-	 * @param string    $column
-	 * @param string    $not
-	 * @param string    $bind
-	 * @param boolean   $insensitiveSearch
+	 * @param string  $prefix
+	 * @param string  $column
+	 * @param string  $not
+	 * @param string  $bind
+	 * @param boolean $insensitiveSearch
 	 *
 	 * @return string     $like_statement
 	 */
@@ -367,4 +405,29 @@ class Builder extends BaseBuilder
 	}
 
 	//--------------------------------------------------------------------
+
+	/**
+	 * JOIN
+	 *
+	 * Generates the JOIN portion of the query
+	 *
+	 * @param string  $table
+	 * @param string  $cond   The join condition
+	 * @param string  $type   The type of join
+	 * @param boolean $escape Whether not to try to escape identifiers
+	 *
+	 * @return BaseBuilder
+	 */
+	public function join(string $table, string $cond, string $type = '', bool $escape = null)
+	{
+		if (! in_array('FULL OUTER', $this->joinTypes, true))
+		{
+			$this->joinTypes = array_merge($this->joinTypes, ['FULL OUTER']);
+		}
+
+		return parent::join($table, $cond, $type, $escape);
+	}
+
+	//--------------------------------------------------------------------
+
 }

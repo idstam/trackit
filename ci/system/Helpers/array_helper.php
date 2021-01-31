@@ -7,6 +7,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,21 +29,17 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
 /**
  * CodeIgniter Array Helpers
  *
- * @package    CodeIgniter
- * @subpackage Helpers
- * @category   Helpers
- * @author     CodeIgniter Dev Team
- * @link       https://codeigniter.com/user_guide/helpers/cookie_helper.html
+ * @package CodeIgniter
  */
 
 if (! function_exists('dot_array_search'))
@@ -82,7 +79,7 @@ if (! function_exists('_array_search_dot'))
 			? array_shift($indexes)
 			: null;
 
-		if (empty($currentIndex) || (! isset($array[$currentIndex]) && $currentIndex !== '*'))
+		if ((empty($currentIndex)  && intval($currentIndex) !== 0) || (! isset($array[$currentIndex]) && $currentIndex !== '*'))
 		{
 			return null;
 		}
@@ -93,7 +90,7 @@ if (! function_exists('_array_search_dot'))
 			// If $array has more than 1 item, we have to loop over each.
 			if (is_array($array))
 			{
-				foreach ($array as $key => $value)
+				foreach ($array as $value)
 				{
 					$answer = _array_search_dot($indexes, $value);
 

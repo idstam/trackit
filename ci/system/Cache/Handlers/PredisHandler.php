@@ -7,6 +7,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +29,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -56,8 +57,7 @@ class PredisHandler implements CacheInterface
 	/**
 	 * Default config
 	 *
-	 * @static
-	 * @var    array
+	 * @var array
 	 */
 	protected $config = [
 		'scheme'   => 'tcp',
@@ -70,12 +70,17 @@ class PredisHandler implements CacheInterface
 	/**
 	 * Predis connection
 	 *
-	 * @var Predis
+	 * @var \Predis\Client
 	 */
 	protected $redis;
 
 	//--------------------------------------------------------------------
 
+	/**
+	 * Constructor.
+	 *
+	 * @param \Config\Cache $config
+	 */
 	public function __construct($config)
 	{
 		$this->prefix = $config->prefix ?: '';
@@ -93,6 +98,8 @@ class PredisHandler implements CacheInterface
 	 */
 	public function initialize()
 	{
+		// Try to connect to Redis, if an issue occurs throw a CriticalError exception,
+		// so that the CacheFactory can attempt to initiate the next cache handler.
 		try
 		{
 			// Create a new instance of Predis\Client
@@ -104,7 +111,7 @@ class PredisHandler implements CacheInterface
 		catch (\Exception $e)
 		{
 			// thrown if can't connect to redis server.
-			throw new CriticalError('Cache: Predis connection refused (' . $e->getMessage() . ')');
+			throw new CriticalError('Cache: Predis connection refused (' . $e->getMessage() . ').');
 		}
 	}
 
@@ -194,7 +201,7 @@ class PredisHandler implements CacheInterface
 	 *
 	 * @param string $key Cache item name
 	 *
-	 * @return mixed
+	 * @return boolean
 	 */
 	public function delete(string $key)
 	{
@@ -236,11 +243,11 @@ class PredisHandler implements CacheInterface
 	/**
 	 * Will delete all items in the entire cache.
 	 *
-	 * @return mixed
+	 * @return boolean
 	 */
 	public function clean()
 	{
-		return $this->redis->flushdb();
+		return $this->redis->flushdb()->getPayload() === 'OK';
 	}
 
 	//--------------------------------------------------------------------
@@ -273,13 +280,15 @@ class PredisHandler implements CacheInterface
 
 		if (isset($data['__ci_value']) && $data['__ci_value'] !== false)
 		{
+			$time = time();
 			return [
-				'expire' => time() + $this->redis->ttl($key),
+				'expire' => $time + $this->redis->ttl($key),
+				'mtime'  => $time,
 				'data'   => $data['__ci_value'],
 			];
 		}
 
-		return false;
+		return null;
 	}
 
 	//--------------------------------------------------------------------

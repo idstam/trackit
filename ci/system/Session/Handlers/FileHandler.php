@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -76,14 +77,11 @@ class FileHandler extends BaseHandler implements \SessionHandlerInterface
 	protected $fileNew;
 
 	/**
+	 * Whether IP addresses should be matched.
+	 *
 	 * @var boolean
 	 */
 	protected $matchIP = false;
-
-	/**
-	 * @var string
-	 */
-	protected $sessionIDRegex;
 
 	//--------------------------------------------------------------------
 
@@ -91,6 +89,7 @@ class FileHandler extends BaseHandler implements \SessionHandlerInterface
 	 * Constructor
 	 *
 	 * @param BaseConfig $config
+	 * @param string     $ipAddress
 	 */
 	public function __construct($config, string $ipAddress)
 	{
@@ -189,7 +188,10 @@ class FileHandler extends BaseHandler implements \SessionHandlerInterface
 			}
 
 			// Needed by write() to detect session_regenerate_id() calls
-			$this->sessionID = $sessionID;
+			if (is_null($this->sessionID))
+			{
+				$this->sessionID = $sessionID;
+			}
 
 			if ($this->fileNew)
 			{
@@ -205,6 +207,7 @@ class FileHandler extends BaseHandler implements \SessionHandlerInterface
 		}
 
 		$session_data = '';
+		clearstatcache();    // Address https://github.com/codeigniter4/CodeIgniter4/issues/2056
 		for ($read = 0, $length = filesize($this->filePath . $sessionID); $read < $length; $read += strlen($buffer))
 		{
 			if (($buffer = fread($this->fileHandle, $length - $read)) === false)
@@ -235,10 +238,9 @@ class FileHandler extends BaseHandler implements \SessionHandlerInterface
 	public function write($sessionID, $sessionData): bool
 	{
 		// If the two IDs don't match, we have a session_regenerate_id() call
-		// and we need to close the old handle and open a new one
-		if ($sessionID !== $this->sessionID && (! $this->close() || $this->read($sessionID) === false))
+		if ($sessionID !== $this->sessionID)
 		{
-			return false;
+			$this->sessionID = $sessionID;
 		}
 
 		if (! is_resource($this->fileHandle))
@@ -296,7 +298,7 @@ class FileHandler extends BaseHandler implements \SessionHandlerInterface
 			flock($this->fileHandle, LOCK_UN);
 			fclose($this->fileHandle);
 
-			$this->fileHandle = $this->fileNew = $this->sessionID = null;
+			$this->fileHandle = $this->fileNew = null;
 
 			return true;
 		}

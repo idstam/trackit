@@ -7,6 +7,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +29,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -39,8 +40,7 @@ namespace CodeIgniter\Commands\Database;
 
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
-use Config\Autoload;
-use Config\Migrations;
+use Config\Services;
 
 /**
  * Creates a new migration file.
@@ -104,6 +104,7 @@ class CreateMigration extends BaseCommand
 	 */
 	public function run(array $params = [])
 	{
+		helper('inflector');
 		$name = array_shift($params);
 
 		if (empty($name))
@@ -116,20 +117,20 @@ class CreateMigration extends BaseCommand
 			CLI::error(lang('Migrations.badCreateName'));
 			return;
 		}
+
 		$ns       = $params['-n'] ?? CLI::getOption('n');
 		$homepath = APPPATH;
 
 		if (! empty($ns))
 		{
-			// Get all namespaces form  PSR4 paths.
-			$config     = new Autoload();
-			$namespaces = $config->psr4;
+			// Get all namespaces
+			$namespaces = Services::autoloader()->getNamespace();
 
 			foreach ($namespaces as $namespace => $path)
 			{
 				if ($namespace === $ns)
 				{
-					$homepath = realpath($path);
+					$homepath = realpath(reset($path));
 					break;
 				}
 			}
@@ -139,43 +140,22 @@ class CreateMigration extends BaseCommand
 			$ns = 'App';
 		}
 
-		// Migrations Config
-		$config = new Migrations();
-
-		if ($config->type !== 'timestamp' && $config->type !== 'sequential')
-		{
-			CLI::error(lang('Migrations.invalidType', [$config->type]));
-			return;
-		}
-
-		// migration Type
-		if ($config->type === 'timestamp')
-		{
-			$fileName = date('YmdHis_') . $name;
-		}
-		else if ($config->type === 'sequential')
-		{
-			// default with 001
-			$sequence = $params[0] ?? '001';
-			// number must be three digits
-			if (! is_numeric($sequence) || strlen($sequence) !== 3)
-			{
-				CLI::error(lang('Migrations.migNumberError'));
-				return;
-			}
-
-			$fileName = $sequence . '_' . $name;
-		}
+		// Always use UTC/GMT so global teams can work together
+		$config   = config('Migrations');
+		$fileName = gmdate($config->timestampFormat) . $name;
 
 		// full path
 		$path = $homepath . '/Database/Migrations/' . $fileName . '.php';
+
+		// Class name should be pascal case now (camel case with upper first letter)
+		$name = pascalize($name);
 
 		$template = <<<EOD
 <?php namespace $ns\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-class Migration_{name} extends Migration
+class {name} extends Migration
 {
 	public function up()
 	{
@@ -196,7 +176,7 @@ EOD;
 		helper('filesystem');
 		if (! write_file($path, $template))
 		{
-			CLI::error(lang('Migrations.writeError'));
+			CLI::error(lang('Migrations.writeError', [$path]));
 			return;
 		}
 

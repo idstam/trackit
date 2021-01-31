@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -40,6 +41,7 @@ namespace CodeIgniter\Database\MySQLi;
 
 use CodeIgniter\Database\BaseResult;
 use CodeIgniter\Database\ResultInterface;
+use CodeIgniter\Entity;
 
 /**
  * Result for MySQLi
@@ -85,26 +87,66 @@ class Result extends BaseResult implements ResultInterface
 	 */
 	public function getFieldData(): array
 	{
-		$retval    = [];
+		static $data_types = [
+			MYSQLI_TYPE_DECIMAL     => 'decimal',
+			MYSQLI_TYPE_NEWDECIMAL  => 'newdecimal',
+			MYSQLI_TYPE_FLOAT       => 'float',
+			MYSQLI_TYPE_DOUBLE      => 'double',
+			
+			MYSQLI_TYPE_BIT         => 'bit',
+			MYSQLI_TYPE_TINY        => 'tiny',
+			MYSQLI_TYPE_SHORT       => 'short',
+			MYSQLI_TYPE_LONG        => 'long',
+			MYSQLI_TYPE_LONGLONG    => 'longlong',
+			MYSQLI_TYPE_INT24       => 'int24',
+			
+			MYSQLI_TYPE_YEAR        => 'year',
+			
+			MYSQLI_TYPE_TIMESTAMP   => 'timestamp',
+			MYSQLI_TYPE_DATE        => 'date',
+			MYSQLI_TYPE_TIME        => 'time',
+			MYSQLI_TYPE_DATETIME    => 'datetime',
+			MYSQLI_TYPE_NEWDATE     => 'newdate',
+			
+			MYSQLI_TYPE_INTERVAL    => 'interval',
+			MYSQLI_TYPE_SET         => 'set',
+			MYSQLI_TYPE_ENUM        => 'enum',
+			
+			MYSQLI_TYPE_VAR_STRING  => 'var_string',
+			MYSQLI_TYPE_STRING      => 'string',
+			MYSQLI_TYPE_CHAR        => 'char',
+			
+			MYSQLI_TYPE_GEOMETRY    => 'geometry',
+			MYSQLI_TYPE_TINY_BLOB   => 'tiny_blob',
+			MYSQLI_TYPE_MEDIUM_BLOB => 'medium_blob',
+			MYSQLI_TYPE_LONG_BLOB   => 'long_blob',
+			MYSQLI_TYPE_BLOB        => 'blob',
+		];
+		
+		$retVal    = [];
 		$fieldData = $this->resultID->fetch_fields();
 
 		foreach ($fieldData as $i => $data)
 		{
-			$retval[$i]              = new \stdClass();
-			$retval[$i]->name        = $data->name;
-			$retval[$i]->type        = $data->type;
-			$retval[$i]->max_length  = $data->max_length;
-			$retval[$i]->primary_key = (int) ($data->flags & 2);
-			$retval[$i]->default     = $data->def;
+			$retVal[$i]              = new \stdClass();
+			$retVal[$i]->name        = $data->name;
+			$retVal[$i]->type        = $data->type;
+			$retVal[$i]->type_name   = isset($data_types[$data->type]) ? $data_types[$data->type] : null;
+			$retVal[$i]->max_length  = $data->max_length;
+			$retVal[$i]->primary_key = (int) ($data->flags & 2);
+			$retVal[$i]->length      = $data->length;
+			$retVal[$i]->default     = $data->def;
 		}
 
-		return $retval;
+		return $retVal;
 	}
 
 	//--------------------------------------------------------------------
 
 	/**
 	 * Frees the current result.
+	 *
+	 * @return void
 	 */
 	public function freeResult()
 	{
@@ -126,7 +168,7 @@ class Result extends BaseResult implements ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function dataSeek($n = 0)
+	public function dataSeek(int $n = 0)
 	{
 		return $this->resultID->data_seek($n);
 	}
@@ -138,7 +180,7 @@ class Result extends BaseResult implements ResultInterface
 	 *
 	 * Overridden by driver classes.
 	 *
-	 * @return array
+	 * @return mixed
 	 */
 	protected function fetchAssoc()
 	{
@@ -154,10 +196,14 @@ class Result extends BaseResult implements ResultInterface
 	 *
 	 * @param string $className
 	 *
-	 * @return object
+	 * @return object|boolean|Entity
 	 */
-	protected function fetchObject($className = 'stdClass')
+	protected function fetchObject(string $className = 'stdClass')
 	{
+		if (is_subclass_of($className, Entity::class))
+		{
+			return empty($data = $this->fetchAssoc()) ? false : (new $className())->setAttributes($data);
+		}
 		return $this->resultID->fetch_object($className);
 	}
 

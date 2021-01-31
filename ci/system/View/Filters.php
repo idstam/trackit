@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,14 +30,17 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
 namespace CodeIgniter\View;
+
+use Config\Services;
+use NumberFormatter;
 
 /**
  * View filters
@@ -183,7 +187,7 @@ class Filters
 	//--------------------------------------------------------------------
 
 	/**
-	 * Limits the number of chracters to $limit, and trails of with an ellipsis.
+	 * Limits the number of characters to $limit, and trails of with an ellipsis.
 	 * Will break at word break so may be more or less than $limit.
 	 *
 	 * @param $value
@@ -232,13 +236,13 @@ class Filters
 		helper('number');
 
 		$types = [
-			'decimal'    => \NumberFormatter::DECIMAL,
-			'currency'   => \NumberFormatter::CURRENCY,
-			'percent'    => \NumberFormatter::PERCENT,
-			'scientific' => \NumberFormatter::SCIENTIFIC,
-			'spellout'   => \NumberFormatter::SPELLOUT,
-			'ordinal'    => \NumberFormatter::ORDINAL,
-			'duration'   => \NumberFormatter::DURATION,
+			'decimal'    => NumberFormatter::DECIMAL,
+			'currency'   => NumberFormatter::CURRENCY,
+			'percent'    => NumberFormatter::PERCENT,
+			'scientific' => NumberFormatter::SCIENTIFIC,
+			'spellout'   => NumberFormatter::SPELLOUT,
+			'ordinal'    => NumberFormatter::ORDINAL,
+			'duration'   => NumberFormatter::DURATION,
 		];
 
 		return format_number($value, $precision, $locale, ['type' => $types[$type]]);
@@ -252,16 +256,18 @@ class Filters
 	 * @param $value
 	 * @param string      $currency
 	 * @param string|null $locale
+	 * @param integer     $fraction
 	 *
 	 * @return string
 	 */
-	public static function local_currency($value, string $currency, string $locale = null): string
+	public static function local_currency($value, string $currency, string $locale = null, $fraction = null): string
 	{
 		helper('number');
 
 		$options = [
-			'type'     => \NumberFormatter::CURRENCY,
+			'type'     => NumberFormatter::CURRENCY,
 			'currency' => $currency,
+			'fraction' => $fraction,
 		];
 
 		return format_number($value, 2, $locale, $options);
@@ -277,7 +283,7 @@ class Filters
 	 */
 	public static function nl2br(string $value): string
 	{
-		$typography = \Config\Services::typography();
+		$typography = Services::typography();
 
 		return $typography->nl2brExceptPre($value);
 	}
@@ -294,7 +300,7 @@ class Filters
 	 */
 	public static function prose(string $value): string
 	{
-		$typography = \Config\Services::typography();
+		$typography = Services::typography();
 
 		return $typography->autoTypography($value);
 	}
@@ -308,13 +314,13 @@ class Filters
 	 *  - ceil      always rounds up
 	 *  - floor     always rounds down
 	 *
-	 * @param string  $value
-	 * @param integer $precision
-	 * @param string  $type
+	 * @param string $value
+	 * @param mixed  $precision
+	 * @param string $type
 	 *
 	 * @return string
 	 */
-	public static function round($value, $precision = 2, $type = 'common'): string
+	public static function round(string $value, $precision = 2, string $type = 'common'): string
 	{
 		if (! is_numeric($precision))
 		{
@@ -326,13 +332,10 @@ class Filters
 		{
 			case 'common':
 				return round($value, $precision);
-				break;
 			case 'ceil':
 				return ceil($value);
-				break;
 			case 'floor':
 				return floor($value);
-				break;
 		}
 
 		// Still here, just return the value.

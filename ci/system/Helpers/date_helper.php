@@ -7,6 +7,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,21 +29,17 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT    MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
 /**
  * CodeIgniter Date Helpers
  *
- * @package    CodeIgniter
- * @subpackage Helpers
- * @category   Helpers
- * @author     CodeIgniter Dev Team
- * @link       https://codeigniter.com/user_guide/helpers/cookie_helper.html
+ * @package CodeIgniter
  */
 
 if (! function_exists('now'))
@@ -56,6 +53,7 @@ if (! function_exists('now'))
 	 * @param string $timezone
 	 *
 	 * @return integer
+	 * @throws \Exception
 	 */
 	function now(string $timezone = null): int
 	{
@@ -70,5 +68,35 @@ if (! function_exists('now'))
 		sscanf($datetime->format('j-n-Y G:i:s'), '%d-%d-%d %d:%d:%d', $day, $month, $year, $hour, $minute, $second);
 
 		return mktime($hour, $minute, $second, $month, $day, $year);
+	}
+}
+
+if (! function_exists('timezone_select'))
+{
+	/**
+	 * Generates a select field of all available timezones
+	 *
+	 * Returns a string with the formatted HTML
+	 *
+	 * @param string  $class   Optional class to apply to the select field
+	 * @param string  $default Default value for initial selection
+	 * @param integer $what    One of the DateTimeZone class constants (for listIdentifiers)
+	 * @param string  $country A two-letter ISO 3166-1 compatible country code (for listIdentifiers)
+	 *
+	 * @return string
+	 * @throws \Exception
+	 */
+	function timezone_select(string $class = '', string $default = '', int $what = \DateTimeZone::ALL, string $country = null): string
+	{
+		$timezones = \DateTimeZone::listIdentifiers($what, $country);
+
+		$buffer = "<select name='timezone' class='{$class}'>" . PHP_EOL;
+		foreach ($timezones as $timezone)
+		{
+			$selected = ($timezone === $default) ? 'selected' : '';
+			$buffer  .= "<option value='{$timezone}' {$selected}>{$timezone}</option>" . PHP_EOL;
+		}
+
+		return $buffer . ('</select>' . PHP_EOL);
 	}
 }

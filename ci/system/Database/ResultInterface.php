@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -53,7 +54,7 @@ interface ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function getResult($type = 'object'): array;
+	public function getResult(string $type = 'object'): array;
 
 	//--------------------------------------------------------------------
 
@@ -96,12 +97,12 @@ interface ResultInterface
 	 *
 	 * If row doesn't exist, returns null.
 	 *
-	 * @param integer $n    The index of the results to return
-	 * @param string  $type The type of result object. 'array', 'object' or class name.
+	 * @param mixed  $n    The index of the results to return
+	 * @param string $type The type of result object. 'array', 'object' or class name.
 	 *
 	 * @return mixed
 	 */
-	public function getRow($n = 0, $type = 'object');
+	public function getRow($n = 0, string $type = 'object');
 
 	//--------------------------------------------------------------------
 
@@ -115,7 +116,7 @@ interface ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function getCustomRowObject($n, string $className);
+	public function getCustomRowObject(int $n, string $className);
 
 	//--------------------------------------------------------------------
 
@@ -128,7 +129,7 @@ interface ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function getRowArray($n = 0);
+	public function getRowArray(int $n = 0);
 
 	//--------------------------------------------------------------------
 
@@ -141,7 +142,7 @@ interface ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function getRowObject($n = 0);
+	public function getRowObject(int $n = 0);
 
 	//--------------------------------------------------------------------
 
@@ -164,7 +165,7 @@ interface ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function getFirstRow($type = 'object');
+	public function getFirstRow(string $type = 'object');
 
 	//--------------------------------------------------------------------
 
@@ -175,7 +176,7 @@ interface ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function getLastRow($type = 'object');
+	public function getLastRow(string $type = 'object');
 
 	//--------------------------------------------------------------------
 
@@ -186,7 +187,7 @@ interface ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function getNextRow($type = 'object');
+	public function getNextRow(string $type = 'object');
 
 	//--------------------------------------------------------------------
 
@@ -197,7 +198,7 @@ interface ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function getPreviousRow($type = 'object');
+	public function getPreviousRow(string $type = 'object');
 
 	//--------------------------------------------------------------------
 
@@ -208,7 +209,7 @@ interface ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function getUnbufferedRow($type = 'object');
+	public function getUnbufferedRow(string $type = 'object');
 
 	//--------------------------------------------------------------------
 
@@ -242,7 +243,7 @@ interface ResultInterface
 	/**
 	 * Frees the current result.
 	 *
-	 * @return mixed
+	 * @return void
 	 */
 	public function freeResult();
 
@@ -257,7 +258,7 @@ interface ResultInterface
 	 *
 	 * @return mixed
 	 */
-	public function dataSeek($n = 0);
+	public function dataSeek(int $n = 0);
 
 	//--------------------------------------------------------------------
 }

@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -41,7 +42,6 @@ namespace CodeIgniter\Commands\Database;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
 use Config\Services;
-use Config\Autoload;
 
 /**
  * Displays a list of all migrations and whether they've been run or not.
@@ -96,10 +96,19 @@ class MigrateStatus extends BaseCommand
 		'-g' => 'Set database group',
 	];
 
+	/**
+	 * Namespaces to ignore when looking for migrations.
+	 *
+	 * @var type
+	 */
 	protected $ignoredNamespaces = [
 		'CodeIgniter',
 		'Config',
 		'Tests\Support',
+		'Kint',
+		'Laminas\ZendFrameworkBridge',
+		'Laminas\Escaper',
+		'Psr\Log',
 	];
 
 	/**
@@ -118,9 +127,11 @@ class MigrateStatus extends BaseCommand
 			$runner->setGroup($group);
 		}
 
-		// Get all namespaces form  PSR4 paths.
-		$config     = new Autoload();
-		$namespaces = $config->psr4;
+		// Get all namespaces
+		$namespaces = Services::autoloader()->getNamespace();
+
+		// Determines whether any migrations were found
+		$found = false;
 
 		// Loop for all $namespaces
 		foreach ($namespaces as $namespace => $path)
@@ -132,15 +143,16 @@ class MigrateStatus extends BaseCommand
 
 			$runner->setNamespace($namespace);
 			$migrations = $runner->findMigrations();
-			$history    = $runner->getHistory();
-
-			CLI::write($namespace);
 
 			if (empty($migrations))
 			{
-				CLI::error(lang('Migrations.noneFound'));
 				continue;
 			}
+
+			$found   = true;
+			$history = $runner->getHistory();
+
+			CLI::write($namespace);
 
 			ksort($migrations);
 
@@ -155,20 +167,25 @@ class MigrateStatus extends BaseCommand
 
 			CLI::write('  ' . str_pad(lang('Migrations.filename'), $max + 4) . lang('Migrations.on'), 'yellow');
 
-			foreach ($migrations as $version => $migration)
+			foreach ($migrations as $uid => $migration)
 			{
 				$date = '';
 				foreach ($history as $row)
 				{
-					if ($row['version'] !== $version)
+					if ($runner->getObjectUid($row) !== $uid)
 					{
 						continue;
 					}
 
-					$date = date('Y-m-d H:i:s', $row['time']);
+					$date = date('Y-m-d H:i:s', $row->time);
 				}
 				CLI::write(str_pad('  ' . $migration->name, $max + 6) . ($date ? $date : '---'));
 			}
+		}
+
+		if (! $found)
+		{
+			CLI::error(lang('Migrations.noneFound'));
 		}
 	}
 

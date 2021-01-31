@@ -7,6 +7,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +29,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -40,6 +41,7 @@ namespace CodeIgniter\Database\SQLite3;
 use CodeIgniter\Database\BaseResult;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 use CodeIgniter\Database\ResultInterface;
+use CodeIgniter\Entity;
 
 /**
  * Result for SQLite3
@@ -92,18 +94,20 @@ class Result extends BaseResult implements ResultInterface
 			SQLITE3_NULL    => 'null',
 		];
 
-		$retval = [];
+		$retVal = [];
 
 		for ($i = 0, $c = $this->getFieldCount(); $i < $c; $i ++)
 		{
-			$retval[$i]             = new \stdClass();
-			$retval[$i]->name       = $this->resultID->columnName($i);
+			$retVal[$i]             = new \stdClass();
+			$retVal[$i]->name       = $this->resultID->columnName($i);
 			$type                   = $this->resultID->columnType($i);
-			$retval[$i]->type       = isset($data_types[$type]) ? $data_types[$type] : $type;
-			$retval[$i]->max_length = null;
+			$retVal[$i]->type       = $type;
+			$retVal[$i]->type_name  = isset($data_types[$type]) ? $data_types[$type] : null;
+			$retVal[$i]->max_length = null;
+			$retVal[$i]->length     = null;
 		}
 
-		return $retval;
+		return $retVal;
 	}
 
 	//--------------------------------------------------------------------
@@ -111,7 +115,7 @@ class Result extends BaseResult implements ResultInterface
 	/**
 	 * Frees the current result.
 	 *
-	 * @return mixed
+	 * @return void
 	 */
 	public function freeResult()
 	{
@@ -134,16 +138,13 @@ class Result extends BaseResult implements ResultInterface
 	 * @return mixed
 	 * @throws \CodeIgniter\Database\Exceptions\DatabaseException
 	 */
-	public function dataSeek($n = 0)
+	public function dataSeek(int $n = 0)
 	{
 		if ($n !== 0)
 		{
-			if ($this->db->DBDebug)
-			{
-				throw new DatabaseException('SQLite3 doesn\'t support seeking to other offset.');
-			}
-			return false;
+			throw new DatabaseException('SQLite3 doesn\'t support seeking to other offset.');
 		}
+
 		return $this->resultID->reset();
 	}
 
@@ -154,7 +155,7 @@ class Result extends BaseResult implements ResultInterface
 	 *
 	 * Overridden by driver classes.
 	 *
-	 * @return array
+	 * @return mixed
 	 */
 	protected function fetchAssoc()
 	{
@@ -170,9 +171,9 @@ class Result extends BaseResult implements ResultInterface
 	 *
 	 * @param string $className
 	 *
-	 * @return object
+	 * @return object|boolean
 	 */
-	protected function fetchObject($className = 'stdClass')
+	protected function fetchObject(string $className = 'stdClass')
 	{
 		// No native support for fetching rows as objects
 		if (($row = $this->fetchAssoc()) === false)
@@ -185,6 +186,12 @@ class Result extends BaseResult implements ResultInterface
 		}
 
 		$classObj = new $className();
+
+		if (is_subclass_of($className, Entity::class))
+		{
+			return $classObj->setAttributes($row);
+		}
+
 		$classSet = \Closure::bind(function ($key, $value) {
 			$this->$key = $value;
 		}, $classObj, $className

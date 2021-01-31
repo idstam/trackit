@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -55,7 +56,14 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 */
 	public $DBDriver = 'SQLite3';
 
-	// --------------------------------------------------------------------
+	/**
+	 * Identifier escape character
+	 *
+	 * @var string
+	 */
+	public $escapeChar = '`';
+
+	//--------------------------------------------------------------------
 
 	/**
 	 * ORDER BY random keyword
@@ -63,7 +71,6 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 * @var array
 	 */
 	protected $_random_keyword = [
-		'RANDOM()',
 		'RANDOM()',
 	];
 
@@ -77,7 +84,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 * @return mixed
 	 * @throws \CodeIgniter\Database\Exceptions\DatabaseException
 	 */
-	public function connect($persistent = false)
+	public function connect(bool $persistent = false)
 	{
 		if ($persistent && $this->db->DBDebug)
 		{
@@ -85,6 +92,11 @@ class Connection extends BaseConnection implements ConnectionInterface
 		}
 		try
 		{
+			if ($this->database !== ':memory:' && strpos($this->database, DIRECTORY_SEPARATOR) === false)
+			{
+				$this->database = WRITEPATH . $this->database;
+			}
+
 			return (! $this->password)
 				? new \SQLite3($this->database)
 				: new \SQLite3($this->database, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE, $this->password);
@@ -101,7 +113,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 * Keep or establish the connection if no queries have been sent for
 	 * a length of time exceeding the server's idle timeout.
 	 *
-	 * @return mixed
+	 * @return void
 	 */
 	public function reconnect()
 	{
@@ -128,9 +140,9 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 *
 	 * @param string $databaseName
 	 *
-	 * @return mixed
+	 * @return boolean
 	 */
-	public function setDatabase(string $databaseName)
+	public function setDatabase(string $databaseName): bool
 	{
 		return false;
 	}
@@ -140,9 +152,9 @@ class Connection extends BaseConnection implements ConnectionInterface
 	/**
 	 * Returns a string containing the version of the database being used.
 	 *
-	 * @return mixed
+	 * @return string
 	 */
-	public function getVersion()
+	public function getVersion(): string
 	{
 		if (isset($this->dataCache['version']))
 		{
@@ -163,11 +175,23 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 *
 	 * @return mixed    \SQLite3Result object or bool
 	 */
-	public function execute($sql)
+	public function execute(string $sql)
 	{
-		return $this->isWriteType($sql)
-			? $this->connID->exec($sql)
-			: $this->connID->query($sql);
+		try
+		{
+			return $this->isWriteType($sql)
+				? $this->connID->exec($sql)
+				: $this->connID->query($sql);
+		}
+		catch (\ErrorException $e)
+		{
+			log_message('error', $e);
+			if ($this->DBDebug)
+			{
+				throw $e;
+			}
+		}
+		return false;
 	}
 
 	//--------------------------------------------------------------------
@@ -175,7 +199,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	/**
 	 * Returns the total number of rows affected by this query.
 	 *
-	 * @return mixed
+	 * @return integer
 	 */
 	public function affectedRows(): int
 	{
@@ -205,9 +229,10 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 *
 	 * @return string
 	 */
-	protected function _listTables($prefixLimit = false): string
+	protected function _listTables(bool $prefixLimit = false): string
 	{
 		return 'SELECT "NAME" FROM "SQLITE_MASTER" WHERE "TYPE" = \'table\''
+			   . ' AND "NAME" NOT LIKE \'sqlite!_%\' ESCAPE \'!\''
 			   . (($prefixLimit !== false && $this->DBPrefix !== '')
 				? ' AND "NAME" LIKE \'' . $this->escapeLikeString($this->DBPrefix) . '%\' ' . sprintf($this->likeEscapeStr,
 					$this->likeEscapeChar)
@@ -236,7 +261,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 * @return array|false
 	 * @throws DatabaseException
 	 */
-	public function getFieldNames($table)
+	public function getFieldNames(string $table)
 	{
 		// Is there a cached result?
 		if (isset($this->dataCache['field_names'][$table]))
@@ -314,19 +339,19 @@ class Connection extends BaseConnection implements ConnectionInterface
 		{
 			return [];
 		}
-		$retval = [];
+		$retVal = [];
 		for ($i = 0, $c = count($query); $i < $c; $i++)
 		{
-			$retval[$i]              = new \stdClass();
-			$retval[$i]->name        = $query[$i]->name;
-			$retval[$i]->type        = $query[$i]->type;
-			$retval[$i]->max_length  = null;
-			$retval[$i]->default     = $query[$i]->dflt_value;
-			$retval[$i]->primary_key = isset($query[$i]->pk) ? (bool)$query[$i]->pk : false;
-			$retval[$i]->nullable    = isset($query[$i]->notnull) ? ! (bool)$query[$i]->notnull : false;
+			$retVal[$i]              = new \stdClass();
+			$retVal[$i]->name        = $query[$i]->name;
+			$retVal[$i]->type        = $query[$i]->type;
+			$retVal[$i]->max_length  = null;
+			$retVal[$i]->default     = $query[$i]->dflt_value;
+			$retVal[$i]->primary_key = isset($query[$i]->pk) && (bool)$query[$i]->pk;
+			$retVal[$i]->nullable    = isset($query[$i]->notnull) && ! (bool)$query[$i]->notnull;
 		}
 
-		return $retval;
+		return $retVal;
 	}
 
 	//--------------------------------------------------------------------
@@ -349,7 +374,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 		}
 		$query = $query->getResultObject();
 
-		$retval = [];
+		$retVal = [];
 		foreach ($query as $row)
 		{
 			$obj       = new \stdClass();
@@ -368,10 +393,10 @@ class Connection extends BaseConnection implements ConnectionInterface
 				$obj->fields[] = $field->name;
 			}
 
-			$retval[$obj->name] = $obj;
+			$retVal[$obj->name] = $obj;
 		}
 
-		return $retval;
+		return $retVal;
 	}
 
 	//--------------------------------------------------------------------
@@ -396,7 +421,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 			return [];
 		}
 
-		$retval = [];
+		$retVal = [];
 
 		foreach ($tables as $table)
 		{
@@ -408,12 +433,37 @@ class Connection extends BaseConnection implements ConnectionInterface
 				$obj->constraint_name    = $row->from . ' to ' . $row->table . '.' . $row->to;
 				$obj->table_name         = $table;
 				$obj->foreign_table_name = $row->table;
+				$obj->sequence           = $row->seq;
 
-				$retval[] = $obj;
+				$retVal[] = $obj;
 			}
 		}
 
-		return $retval;
+		return $retVal;
+	}
+
+	//--------------------------------------------------------------------
+
+	/**
+	 * Returns platform-specific SQL to disable foreign key checks.
+	 *
+	 * @return string
+	 */
+	protected function _disableForeignKeyChecks()
+	{
+		return 'PRAGMA foreign_keys = OFF';
+	}
+
+	//--------------------------------------------------------------------
+
+	/**
+	 * Returns platform-specific SQL to enable foreign key checks.
+	 *
+	 * @return string
+	 */
+	protected function _enableForeignKeyChecks()
+	{
+		return 'PRAGMA foreign_keys = ON';
 	}
 
 	//--------------------------------------------------------------------
@@ -505,7 +555,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 *
 	 * @return boolean
 	 */
-	protected function supportsForeignKeys(): bool
+	public function supportsForeignKeys(): bool
 	{
 		$result = $this->simpleQuery('PRAGMA foreign_keys');
 

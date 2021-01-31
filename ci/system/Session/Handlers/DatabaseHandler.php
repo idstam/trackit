@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,18 +30,18 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
 namespace CodeIgniter\Session\Handlers;
 
-use CodeIgniter\Session\Exceptions\SessionException;
 use CodeIgniter\Config\BaseConfig;
 use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\Session\Exceptions\SessionException;
 use Config\Database;
 
 /**
@@ -90,6 +91,7 @@ class DatabaseHandler extends BaseHandler implements \SessionHandlerInterface
 	 * Constructor
 	 *
 	 * @param BaseConfig $config
+	 * @param string     $ipAddress
 	 */
 	public function __construct(BaseConfig $config, string $ipAddress)
 	{
@@ -163,7 +165,10 @@ class DatabaseHandler extends BaseHandler implements \SessionHandlerInterface
 		}
 
 		// Needed by write() to detect session_regenerate_id() calls
-		$this->sessionID = $sessionID;
+		if (is_null($this->sessionID))
+		{
+			$this->sessionID = $sessionID;
+		}
 
 		$builder = $this->db->table($this->table)
 				->select('data')
@@ -227,11 +232,6 @@ class DatabaseHandler extends BaseHandler implements \SessionHandlerInterface
 		// Was the ID regenerated?
 		elseif ($sessionID !== $this->sessionID)
 		{
-			if (! $this->releaseLock() || ! $this->lockSession($sessionID))
-			{
-				return $this->fail();
-			}
-
 			$this->rowExists = false;
 			$this->sessionID = $sessionID;
 		}
@@ -352,6 +352,12 @@ class DatabaseHandler extends BaseHandler implements \SessionHandlerInterface
 
 	//--------------------------------------------------------------------
 
+	/**
+	 * Lock the session.
+	 *
+	 * @param  string $sessionID
+	 * @return boolean
+	 */
 	protected function lockSession(string $sessionID): bool
 	{
 		if ($this->platform === 'mysql')

@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,16 +30,17 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
 namespace CodeIgniter\Cache;
 
 use CodeIgniter\Cache\Exceptions\CacheException;
+use CodeIgniter\Exceptions\CriticalError;
 
 /**
  * Class Cache
@@ -52,9 +54,9 @@ class CacheFactory
 	/**
 	 * Attempts to create the desired cache handler, based upon the
 	 *
-	 * @param $config
-	 * @param string $handler
-	 * @param string $backup
+	 * @param \Config\Cache $config
+	 * @param string|null   $handler
+	 * @param string|null   $backup
 	 *
 	 * @return \CodeIgniter\Cache\CacheInterface
 	 */
@@ -93,7 +95,20 @@ class CacheFactory
 			}
 		}
 
-		$adapter->initialize();
+		// If $adapter->initialization throws a CriticalError exception, we will attempt to
+		// use the $backup handler, if that also fails, we resort to the dummy handler.
+		try
+		{
+			$adapter->initialize();
+		}
+		catch (CriticalError $e)
+		{
+			// log the fact that an exception occurred as well what handler we are resorting to
+			log_message('critical', $e->getMessage() . ' Resorting to using ' . $backup . ' handler.');
+
+			// get the next best cache handler (or dummy if the $backup also fails)
+			$adapter = self::getHandler($config, $backup, 'dummy');
+		}
 
 		return $adapter;
 	}

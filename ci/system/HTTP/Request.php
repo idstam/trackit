@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -84,7 +85,10 @@ class Request extends Message implements RequestInterface
 	{
 		$this->proxyIPs = $config->proxyIPs;
 
-		$this->method = $this->getServer('REQUEST_METHOD') ?? 'GET';
+		if (empty($this->method))
+		{
+			$this->method = $this->getServer('REQUEST_METHOD') ?? 'GET';
+		}
 	}
 
 	//--------------------------------------------------------------------
@@ -231,7 +235,7 @@ class Request extends Message implements RequestInterface
 	 */
 	public function isValidIP(string $ip = null, string $which = null): bool
 	{
-		switch (strtolower($which))
+		switch (strtolower( (string) $which))
 		{
 			case 'ipv4':
 				$which = FILTER_FLAG_IPV4;
@@ -256,7 +260,7 @@ class Request extends Message implements RequestInterface
 	 *
 	 * @return string
 	 */
-	public function getMethod($upper = false): string
+	public function getMethod(bool $upper = false): string
 	{
 		return ($upper) ? strtoupper($this->method) : strtolower($this->method);
 	}
@@ -414,6 +418,16 @@ class Request extends Message implements RequestInterface
 		if (! isset($value))
 		{
 			$value = $this->globals[$method][$index] ?? null;
+		}
+
+		if (is_array($value) && ($filter !== null || $flags !== null))
+		{
+			// Iterate over array and append filter and flags
+			array_walk_recursive($value, function (&$val) use ($filter, $flags) {
+				$val = filter_var($val, $filter, $flags);
+			});
+
+			return $value;
 		}
 
 		// Cannot filter these types of data automatically...

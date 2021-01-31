@@ -1,6 +1,5 @@
 <?php
 
-
 /**
  * CodeIgniter
  *
@@ -9,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,18 +30,18 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
 namespace CodeIgniter\Files;
 
-use SplFileInfo;
 use CodeIgniter\Files\Exceptions\FileException;
 use CodeIgniter\Files\Exceptions\FileNotFoundException;
+use SplFileInfo;
 
 /**
  * Wrapper for PHP's built-in SplFileInfo, with goodies.
@@ -86,29 +86,36 @@ class File extends SplFileInfo
 	 * the file in the $_FILES array if available, as PHP calculates this based
 	 * on the actual size transmitted.
 	 *
-	 * @param string $unit The unit to return:
-	 *      - b   Bytes
-	 *      - kb  Kilobytes
-	 *      - mb  Megabytes
-	 *
-	 * @return integer|null The file size in bytes or null if unknown.
+	 * @return integer The file size in bytes
 	 */
-	public function getSize(string $unit = 'b')
+	public function getSize()
 	{
 		if (is_null($this->size))
 		{
-			$this->size = filesize($this->getPathname());
+			$this->size = parent::getSize();
 		}
 
+		return $this->size;
+	}
+
+	/**
+	 * Retrieve the file size by unit.
+	 *
+	 * @param string $unit
+	 *
+	 * @return integer|string
+	 */
+	public function getSizeByUnit(string $unit = 'b')
+	{
 		switch (strtolower($unit))
 		{
 			case 'kb':
-				return number_format($this->size / 1024, 3);
+				return number_format($this->getSize() / 1024, 3);
 			case 'mb':
-				return number_format(($this->size / 1024) / 1024, 3);
+				return number_format(($this->getSize() / 1024) / 1024, 3);
+			default:
+				return $this->getSize();
 		}
-
-		return (int) $this->size;
 	}
 
 	//--------------------------------------------------------------------
@@ -135,6 +142,13 @@ class File extends SplFileInfo
 	 */
 	public function getMimeType(): string
 	{
+		if (! function_exists('finfo_open'))
+		{
+			// @codeCoverageIgnoreStart
+			return $this->originalMimeType ?? 'application/octet-stream';
+			// @codeCoverageIgnoreEnd
+		}
+
 		$finfo    = finfo_open(FILEINFO_MIME_TYPE);
 		$mimeType = finfo_file($finfo, $this->getRealPath());
 		finfo_close($finfo);
@@ -151,7 +165,9 @@ class File extends SplFileInfo
 	 */
 	public function getRandomName(): string
 	{
-		return time() . '_' . bin2hex(random_bytes(10)) . '.' . $this->getExtension();
+		$extension = $this->getExtension();
+		$extension = empty($extension) ? '' : '.' . $extension;
+		return time() . '_' . bin2hex(random_bytes(10)) . $extension;
 	}
 
 	//--------------------------------------------------------------------
@@ -179,7 +195,7 @@ class File extends SplFileInfo
 			throw FileException::forUnableToMove($this->getBasename(), $targetPath, strip_tags($error['message']));
 		}
 
-		@chmod($targetPath, 0777 & ~umask());
+		@chmod($destination, 0777 & ~umask());
 
 		return new File($destination);
 	}
@@ -203,7 +219,8 @@ class File extends SplFileInfo
 	{
 		while (is_file($destination))
 		{
-			$info = pathinfo($destination);
+			$info      = pathinfo($destination);
+			$extension = isset($info['extension']) ? '.' . $info['extension'] : '';
 			if (strpos($info['filename'], $delimiter) !== false)
 			{
 				$parts = explode($delimiter, $info['filename']);
@@ -212,16 +229,16 @@ class File extends SplFileInfo
 					$i = end($parts);
 					array_pop($parts);
 					array_push($parts, ++ $i);
-					$destination = $info['dirname'] . '/' . implode($delimiter, $parts) . '.' . $info['extension'];
+					$destination = $info['dirname'] . '/' . implode($delimiter, $parts) . $extension;
 				}
 				else
 				{
-					$destination = $info['dirname'] . '/' . $info['filename'] . $delimiter . ++ $i . '.' . $info['extension'];
+					$destination = $info['dirname'] . '/' . $info['filename'] . $delimiter . ++ $i . $extension;
 				}
 			}
 			else
 			{
-				$destination = $info['dirname'] . '/' . $info['filename'] . $delimiter . ++ $i . '.' . $info['extension'];
+				$destination = $info['dirname'] . '/' . $info['filename'] . $delimiter . ++ $i . $extension;
 			}
 		}
 		return $destination;

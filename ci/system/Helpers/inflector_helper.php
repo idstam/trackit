@@ -7,6 +7,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +29,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT    MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -40,11 +41,7 @@
 /**
  * CodeIgniter Inflector Helpers
  *
- * @package    CodeIgniter
- * @subpackage Helpers
- * @category   Helpers
- * @author     CodeIgniter Dev Team
- * @link       https://codeigniter.com/user_guide/helpers/inflector_helper.html
+ * @package CodeIgniter
  */
 if (! function_exists('singular'))
 {
@@ -169,13 +166,35 @@ if (! function_exists('plural'))
 
 //--------------------------------------------------------------------
 
+if (! function_exists('counted'))
+{
+	/**
+	 * Counted
+	 *
+	 * Takes a number and a word to return the plural or not
+	 * E.g. 0 cats, 1 cat, 2 cats, ...
+	 *
+	 * @param  integer $count  Number of items
+	 * @param  string  $string Input string
+	 * @return string
+	 */
+	function counted(int $count, string $string): string
+	{
+		$result = "{$count} ";
+
+		return $result . ($count === 1 ? singular($string) : plural($string));
+	}
+}
+
+//--------------------------------------------------------------------
+
 if (! function_exists('camelize'))
 {
 	/**
 	 * Camelize
 	 *
 	 * Takes multiple words separated by spaces or
-	 * underscores and camelizes them
+	 * underscores and converts them to camel case.
 	 *
 	 * @param  string $string Input string
 	 * @return string
@@ -185,6 +204,27 @@ if (! function_exists('camelize'))
 		return lcfirst(str_replace(' ', '', ucwords(preg_replace('/[\s_]+/', ' ', $string))));
 	}
 }
+
+//--------------------------------------------------------------------
+
+if (! function_exists('pascalize'))
+{
+	/**
+	 * Pascalize
+	 *
+	 * Takes multiple words separated by spaces or
+	 * underscores and converts them to Pascal case,
+	 * which is camel case with an uppercase first letter.
+	 *
+	 * @param  string $string Input string
+	 * @return string
+	 */
+	function pascalize(string $string): string
+	{
+		return ucfirst(camelize($string));
+	}
+}
+
 //--------------------------------------------------------------------
 
 if (! function_exists('underscore'))
@@ -222,12 +262,11 @@ if (! function_exists('humanize'))
 	function humanize(string $string, string $separator = '_'): string
 	{
 		$replacement = trim($string);
-		$upperCased  = ucwords
+
+		return ucwords
 				(
 				preg_replace('/[' . $separator . ']+/', ' ', $replacement)
 		);
-
-		return $upperCased;
 	}
 }
 
@@ -241,53 +280,58 @@ if (! function_exists('is_pluralizable'))
 	 * @param  string $word Word to check
 	 * @return boolean
 	 */
-	function is_pluralizable($word): bool
+	function is_pluralizable(string $word): bool
 	{
 		$uncountables = in_array
 				(
-				strtolower($word), [
-							   'advice',
-							   'bravery',
-							   'butter',
-							   'clarity',
-							   'coal',
-							   'courage',
-							   'cowardice',
-							   'curiosity',
-							   'education',
-							   'equipment',
-							   'evidence',
-							   'fish',
-							   'fun',
-							   'furniture',
-							   'help',
-							   'homework',
-							   'honesty',
-							   'information',
-							   'insurance',
-							   'jewelry',
-							   'knowledge',
-							   'livestock',
-							   'love',
-							   'luck',
-							   'marketing',
-							   'meta',
-							   'money',
-							   'mud',
-							   'news',
-							   'rice',
-							   'satisfaction',
-							   'scenery',
-							   'series',
-							   'silence',
-							   'species',
-							   'spelling',
-							   'sugar',
-							   'water',
-							   'weather',
-							   'wisdom',
-							   'work',
-						   ]);
+			strtolower($word), [
+						   'advice',
+						   'bravery',
+						   'butter',
+						   'chaos',
+						   'clarity',
+						   'coal',
+						   'courage',
+						   'cowardice',
+						   'curiosity',
+						   'education',
+						   'equipment',
+						   'evidence',
+						   'fish',
+						   'fun',
+						   'furniture',
+						   'greed',
+						   'help',
+						   'homework',
+						   'honesty',
+						   'information',
+						   'insurance',
+						   'jewelry',
+						   'knowledge',
+						   'livestock',
+						   'love',
+						   'luck',
+						   'marketing',
+						   'meta',
+						   'money',
+						   'mud',
+						   'news',
+						   'patriotism',
+						   'racism',
+						   'rice',
+						   'satisfaction',
+						   'scenery',
+						   'series',
+						   'sexism',
+						   'silence',
+						   'species',
+						   'spelling',
+						   'sugar',
+						   'water',
+						   'weather',
+						   'wisdom',
+						   'work',
+					   ]);
 
 		return ! $uncountables;
 	}

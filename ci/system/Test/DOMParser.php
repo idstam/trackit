@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -44,10 +45,17 @@ namespace CodeIgniter\Test;
 class DOMParser
 {
 	/**
+	 * DOM for the body,
+	 *
 	 * @var \DOMDocument
 	 */
 	protected $dom;
 
+	/**
+	 * Constructor.
+	 *
+	 * @throws \BadMethodCallException
+	 */
 	public function __construct()
 	{
 		if (! extension_loaded('DOM'))
@@ -125,6 +133,7 @@ class DOMParser
 	 * Checks to see if the text is found within the result.
 	 *
 	 * @param string $search
+	 * @param string $element
 	 *
 	 * @return boolean
 	 */
@@ -133,8 +142,8 @@ class DOMParser
 		// If Element is null, we're just scanning for text
 		if (is_null($element))
 		{
-			$content = $this->dom->saveHTML();
-			return strpos($content, $search) !== false;
+			$content = $this->dom->saveHTML($this->dom->documentElement);
+			return mb_strpos($content, $search) !== false;
 		}
 
 		$result = $this->doXPath($search, $element);
@@ -227,6 +236,14 @@ class DOMParser
 	}
 
 	//--------------------------------------------------------------------
+	/**
+	 * Search the DOM using an XPath expression.
+	 *
+	 * @param  string $search
+	 * @param  string $element
+	 * @param  array  $paths
+	 * @return type
+	 */
 
 	protected function doXPath(string $search = null, string $element, array $paths = [])
 	{
@@ -281,11 +298,15 @@ class DOMParser
 
 		$xpath = new \DOMXPath($this->dom);
 
-		$result = $xpath->query($path);
-
-		return $result;
+		return $xpath->query($path);
 	}
 
+	/**
+	 * Look for the a selector  in the passed text.
+	 *
+	 * @param  string $selector
+	 * @return type
+	 */
 	public function parseSelector(string $selector)
 	{
 		$tag   = null;

@@ -7,6 +7,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +29,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -88,11 +89,15 @@ class Table
 	protected $prefixedTableName;
 
 	/**
+	 * Database connection.
+	 *
 	 * @var Connection
 	 */
 	protected $db;
 
 	/**
+	 * Handle to our forge.
+	 *
 	 * @var Forge
 	 */
 	protected $forge;
@@ -101,6 +106,7 @@ class Table
 	 * Table constructor.
 	 *
 	 * @param Connection $db
+	 * @param Forge      $forge
 	 */
 	public function __construct(Connection $db, Forge $forge)
 	{
@@ -179,15 +185,29 @@ class Table
 	}
 
 	/**
-	 * Drops a column from the table.
+	 * Drops columns from the table.
 	 *
-	 * @param string $column
+	 * @param string|array $columns
 	 *
 	 * @return \CodeIgniter\Database\SQLite3\Table
 	 */
-	public function dropColumn(string $column)
+	public function dropColumn($columns)
 	{
-		unset($this->fields[$column]);
+		//unset($this->fields[$column]);
+
+		if (is_string($columns))
+		{
+			$columns = explode(',', $columns);
+		}
+
+		foreach ($columns as $column)
+		{
+			$column = trim($column);
+			if (isset($this->fields[$column]))
+			{
+				unset($this->fields[$column]);
+			}
+		}
 
 		return $this;
 	}
@@ -213,7 +233,43 @@ class Table
 	}
 
 	/**
+	 * Drops a foreign key from this table so that
+	 * it won't be recreated in the future.
+	 *
+	 * @param string $column
+	 *
+	 * @return \CodeIgniter\Database\SQLite3\Table
+	 */
+	public function dropForeignKey(string $column)
+	{
+		if (empty($this->foreignKeys))
+		{
+			return $this;
+		}
+
+		for ($i = 0; $i < count($this->foreignKeys); $i++)
+		{
+			if ($this->foreignKeys[$i]->table_name !== $this->tableName)
+			{
+				continue;
+			}
+
+			// The column name should be the first thing in the constraint name
+			if (strpos($this->foreignKeys[$i]->constraint_name, $column) !== 0)
+			{
+				continue;
+			}
+
+			unset($this->foreignKeys[$i]);
+		}
+
+		return $this;
+	}
+
+	/**
 	 * Creates the new table based on our current fields.
+	 *
+	 * @return mixed
 	 */
 	protected function createTable()
 	{
@@ -264,6 +320,8 @@ class Table
 	 * Copies data from our old table to the new one,
 	 * taking care map data correctly based on any columns
 	 * that have been renamed.
+	 *
+	 * @return void
 	 */
 	protected function copyData()
 	{
@@ -297,7 +355,7 @@ class Table
 	 *
 	 * @param array|boolean $fields
 	 *
-	 * @return array
+	 * @return mixed
 	 */
 	protected function formatFields($fields)
 	{
@@ -332,7 +390,7 @@ class Table
 	 * Converts keys retrieved from the database to
 	 * the format needed to create later.
 	 *
-	 * @param $keys
+	 * @param mixed $keys
 	 *
 	 * @return mixed
 	 */
@@ -359,6 +417,8 @@ class Table
 	/**
 	 * Attempts to drop all indexes and constraints
 	 * from the database for this table.
+	 *
+	 * @return null|void
 	 */
 	protected function dropIndexes()
 	{

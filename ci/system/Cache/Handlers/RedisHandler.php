@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,16 +30,17 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
 namespace CodeIgniter\Cache\Handlers;
 
 use CodeIgniter\Cache\CacheInterface;
+use CodeIgniter\Exceptions\CriticalError;
 
 /**
  * Redis cache handler
@@ -56,8 +58,7 @@ class RedisHandler implements CacheInterface
 	/**
 	 * Default config
 	 *
-	 * @static
-	 * @var    array
+	 * @var array
 	 */
 	protected $config = [
 		'host'     => '127.0.0.1',
@@ -70,27 +71,31 @@ class RedisHandler implements CacheInterface
 	/**
 	 * Redis connection
 	 *
-	 * @var Redis
+	 * @var \Redis
 	 */
 	protected $redis;
 
 	//--------------------------------------------------------------------
 
+	/**
+	 * Constructor.
+	 *
+	 * @param \Config\Cache $config
+	 */
 	public function __construct($config)
 	{
-		$config       = (array)$config;
-		$this->prefix = $config['prefix'] ?? '';
+		$this->prefix = $config->prefix ?: '';
 
 		if (! empty($config))
 		{
-			$this->config = array_merge($this->config, $config['redis']);
+			$this->config = array_merge($this->config, $config->redis);
 		}
 	}
 
 	/**
 	 * Class destructor
 	 *
-	 * Closes the connection to Memcache(d) if present.
+	 * Closes the connection to Redis if present.
 	 */
 	public function __destruct()
 	{
@@ -110,19 +115,38 @@ class RedisHandler implements CacheInterface
 		$config = $this->config;
 
 		$this->redis = new \Redis();
-		if (! $this->redis->connect($config['host'], ($config['host'][0] === '/' ? 0 : $config['port']), $config['timeout']))
-		{
-			log_message('error', 'Cache: Redis connection failed. Check your configuration.');
-		}
 
-		if (isset($config['password']) && ! $this->redis->auth($config['password']))
+		// Try to connect to Redis, if an issue occurs throw a CriticalError exception,
+		// so that the CacheFactory can attempt to initiate the next cache handler.
+		try
 		{
-			log_message('error', 'Cache: Redis authentication failed.');
-		}
+			// Note:: If Redis is your primary cache choice, and it is "offline", every page load will end up been delayed by the timeout duration.
+			// I feel like some sort of temporary flag should be set, to indicate that we think Redis is "offline", allowing us to bypass the timeout for a set period of time.
 
-		if (isset($config['database']) && ! $this->redis->select($config['database']))
+			if (! $this->redis->connect($config['host'], ($config['host'][0] === '/' ? 0 : $config['port']), $config['timeout']))
+			{
+				// Note:: I'm unsure if log_message() is necessary, however I'm not 100% comfortable removing it.
+				log_message('error', 'Cache: Redis connection failed. Check your configuration.');
+				throw new CriticalError('Cache: Redis connection failed. Check your configuration.');
+			}
+
+			if (isset($config['password']) && ! $this->redis->auth($config['password']))
+			{
+				log_message('error', 'Cache: Redis authentication failed.');
+				throw new CriticalError('Cache: Redis authentication failed.');
+			}
+
+			if (isset($config['database']) && ! $this->redis->select($config['database']))
+			{
+				log_message('error', 'Cache: Redis select database failed.');
+				throw new CriticalError('Cache: Redis select database failed.');
+			}
+		}
+		catch (\RedisException $e)
 		{
-			log_message('error', 'Cache: Redis select database failed.');
+			// $this->redis->connect() can sometimes throw a RedisException.
+			// We need to convert the exception into a CriticalError exception and throw it.
+			throw new CriticalError('Cache: RedisException occurred with message (' . $e->getMessage() . ').');
 		}
 	}
 
@@ -214,13 +238,13 @@ class RedisHandler implements CacheInterface
 	 *
 	 * @param string $key Cache item name
 	 *
-	 * @return mixed
+	 * @return boolean
 	 */
 	public function delete(string $key)
 	{
 		$key = $this->prefix . $key;
 
-		return ($this->redis->delete($key) === 1);
+		return ($this->redis->del($key) === 1);
 	}
 
 	//--------------------------------------------------------------------
@@ -262,7 +286,7 @@ class RedisHandler implements CacheInterface
 	/**
 	 * Will delete all items in the entire cache.
 	 *
-	 * @return mixed
+	 * @return boolean
 	 */
 	public function clean()
 	{

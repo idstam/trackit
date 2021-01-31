@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -89,7 +90,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 * @return mixed
 	 * @throws \CodeIgniter\Database\Exceptions\DatabaseException
 	 */
-	public function connect($persistent = false)
+	public function connect(bool $persistent = false)
 	{
 		// Do we have a socket path?
 		if ($this->hostname[0] === '/')
@@ -102,7 +103,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 		{
 			$hostname = ($persistent === true) ? 'p:' . $this->hostname : $this->hostname;
 			$port     = empty($this->port) ? null : $this->port;
-			$socket   = null;
+			$socket   = '';
 		}
 
 		$client_flags = ($this->compress === true) ? MYSQLI_CLIENT_COMPRESS : 0;
@@ -202,7 +203,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 						"Database: Unable to set the configured connection charset ('{$this->charset}').");
 					$this->mysqli->close();
 
-					if ($this->db->debug)
+					if ($this->DBDebug)
 					{
 						throw new DatabaseException('Unable to set client connection character set: ' . $this->charset);
 					}
@@ -245,6 +246,8 @@ class Connection extends BaseConnection implements ConnectionInterface
 
 	/**
 	 * Close the database connection.
+	 *
+	 * @return void
 	 */
 	protected function _close()
 	{
@@ -258,9 +261,9 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 *
 	 * @param string $databaseName
 	 *
-	 * @return mixed
+	 * @return boolean
 	 */
-	public function setDatabase(string $databaseName)
+	public function setDatabase(string $databaseName): bool
 	{
 		if ($databaseName === '')
 		{
@@ -287,9 +290,9 @@ class Connection extends BaseConnection implements ConnectionInterface
 	/**
 	 * Returns a string containing the version of the database being used.
 	 *
-	 * @return mixed
+	 * @return string
 	 */
-	public function getVersion()
+	public function getVersion(): string
 	{
 		if (isset($this->dataCache['version']))
 		{
@@ -313,7 +316,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 *
 	 * @return mixed
 	 */
-	public function execute($sql)
+	public function execute(string $sql)
 	{
 		while ($this->connID->more_results())
 		{
@@ -323,8 +326,19 @@ class Connection extends BaseConnection implements ConnectionInterface
 				$res->free();
 			}
 		}
-
-		return $this->connID->query($this->prepQuery($sql));
+		try
+		{
+			return $this->connID->query($this->prepQuery($sql));
+		}
+		catch (\mysqli_sql_exception $e)
+		{
+			log_message('error', $e);
+			if ($this->DBDebug)
+			{
+				throw $e;
+			}
+		}
+		return false;
 	}
 
 	//--------------------------------------------------------------------
@@ -338,7 +352,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 *
 	 * @return string
 	 */
-	protected function prepQuery($sql)
+	protected function prepQuery(string $sql): string
 	{
 		// mysqli_affected_rows() returns 0 for "DELETE FROM TABLE" queries. This hack
 		// modifies the query so that it a proper number of affected rows is returned.
@@ -355,7 +369,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	/**
 	 * Returns the total number of rows affected by this query.
 	 *
-	 * @return mixed
+	 * @return integer
 	 */
 	public function affectedRows(): int
 	{
@@ -388,19 +402,58 @@ class Connection extends BaseConnection implements ConnectionInterface
 	//--------------------------------------------------------------------
 
 	/**
+	 * Escape Like String Direct
+	 * There are a few instances where MySQLi queries cannot take the
+	 * additional "ESCAPE x" parameter for specifying the escape character
+	 * in "LIKE" strings, and this handles those directly with a backslash.
+	 *
+	 * @param  string|string[] $str Input string
+	 * @return string|string[]
+	 */
+	public function escapeLikeStringDirect($str)
+	{
+		if (is_array($str))
+		{
+			foreach ($str as $key => $val)
+			{
+				$str[$key] = $this->escapeLikeStringDirect($val);
+			}
+
+			return $str;
+		}
+
+		$str = $this->_escapeString($str);
+
+		// Escape LIKE condition wildcards
+		return str_replace([
+			$this->likeEscapeChar,
+			'%',
+			'_',
+		], [
+			'\\' . $this->likeEscapeChar,
+			'\\' . '%',
+			'\\' . '_',
+		], $str
+		);
+	}
+
+	//--------------------------------------------------------------------
+
+	/**
 	 * Generates the SQL for listing tables in a platform-dependent manner.
+	 * Uses escapeLikeStringDirect().
 	 *
 	 * @param boolean $prefixLimit
 	 *
 	 * @return string
 	 */
-	protected function _listTables($prefixLimit = false): string
+	protected function _listTables(bool $prefixLimit = false): string
 	{
 		$sql = 'SHOW TABLES FROM ' . $this->escapeIdentifiers($this->database);
 
 		if ($prefixLimit !== false && $this->DBPrefix !== '')
 		{
-			return $sql . " LIKE '" . $this->escapeLikeString($this->DBPrefix) . "%'";
+			return $sql . " LIKE '" . $this->escapeLikeStringDirect($this->DBPrefix) . "%'";
 		}
 
 		return $sql;
@@ -439,19 +492,20 @@ class Connection extends BaseConnection implements ConnectionInterface
 		}
 		$query = $query->getResultObject();
 
-		$retval = [];
+		$retVal = [];
 		for ($i = 0, $c = count($query); $i < $c; $i++)
 		{
-			$retval[$i]       = new \stdClass();
-			$retval[$i]->name = $query[$i]->Field;
+			$retVal[$i]       = new \stdClass();
+			$retVal[$i]->name = $query[$i]->Field;
 
-			sscanf($query[$i]->Type, '%[a-z](%d)', $retval[$i]->type, $retval[$i]->max_length);
+			sscanf($query[$i]->Type, '%[a-z](%d)', $retVal[$i]->type, $retVal[$i]->max_length);
 
-			$retval[$i]->default     = $query[$i]->Default;
-			$retval[$i]->primary_key = (int)($query[$i]->Key === 'PRI');
+			$retVal[$i]->nullable    = $query[$i]->Null === 'YES';
+			$retVal[$i]->default     = $query[$i]->Default;
+			$retVal[$i]->primary_key = (int)($query[$i]->Key === 'PRI');
 		}
 
-		return $retval;
+		return $retVal;
 	}
 
 	//--------------------------------------------------------------------
@@ -535,10 +589,14 @@ class Connection extends BaseConnection implements ConnectionInterface
                     SELECT
                         tc.CONSTRAINT_NAME,
                         tc.TABLE_NAME,
-                        rc.REFERENCED_TABLE_NAME
+                        kcu.COLUMN_NAME,
+                        rc.REFERENCED_TABLE_NAME,
+                        kcu.REFERENCED_COLUMN_NAME
                     FROM information_schema.TABLE_CONSTRAINTS AS tc
                     INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS AS rc
                         ON tc.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+                    INNER JOIN information_schema.KEY_COLUMN_USAGE AS kcu
+                        ON tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME
                     WHERE
                         tc.CONSTRAINT_TYPE = ' . $this->escape('FOREIGN KEY') . ' AND
                         tc.TABLE_SCHEMA = ' . $this->escape($this->database) . ' AND
@@ -550,18 +608,44 @@ class Connection extends BaseConnection implements ConnectionInterface
 		}
 		$query = $query->getResultObject();
 
-		$retval = [];
+		$retVal = [];
 		foreach ($query as $row)
 		{
-			$obj                     = new \stdClass();
-			$obj->constraint_name    = $row->CONSTRAINT_NAME;
-			$obj->table_name         = $row->TABLE_NAME;
-			$obj->foreign_table_name = $row->REFERENCED_TABLE_NAME;
+			$obj                      = new \stdClass();
+			$obj->constraint_name     = $row->CONSTRAINT_NAME;
+			$obj->table_name          = $row->TABLE_NAME;
+			$obj->column_name         = $row->COLUMN_NAME;
+			$obj->foreign_table_name  = $row->REFERENCED_TABLE_NAME;
+			$obj->foreign_column_name = $row->REFERENCED_COLUMN_NAME;
 
-			$retval[] = $obj;
+			$retVal[] = $obj;
 		}
 
-		return $retval;
+		return $retVal;
+	}
+
+	//--------------------------------------------------------------------
+
+	/**
+	 * Returns platform-specific SQL to disable foreign key checks.
+	 *
+	 * @return string
+	 */
+	protected function _disableForeignKeyChecks()
+	{
+		return 'SET FOREIGN_KEY_CHECKS=0';
+	}
+
+	//--------------------------------------------------------------------
+
+	/**
+	 * Returns platform-specific SQL to enable foreign key checks.
+	 *
+	 * @return string
+	 */
+	protected function _enableForeignKeyChecks()
+	{
+		return 'SET FOREIGN_KEY_CHECKS=1';
 	}
 
 	//--------------------------------------------------------------------
@@ -575,7 +659,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 *
 	 * @return array
 	 */
-	public function error()
+	public function error(): array
 	{
 		if (! empty($this->mysqli->connect_errno))
 		{
@@ -598,7 +682,7 @@ class Connection extends BaseConnection implements ConnectionInterface
 	 *
 	 * @return integer
 	 */
-	public function insertID()
+	public function insertID(): int
 	{
 		return $this->connID->insert_id;
 	}

@@ -7,6 +7,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,26 +29,27 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
 namespace CodeIgniter\Test;
 
-use Config\Services;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Database\MigrationRunner;
 use CodeIgniter\Exceptions\ConfigException;
+use Config\Database;
+use Config\Migrations;
+use Config\Services;
 
 /**
  * CIDatabaseTestCase
  */
 class CIDatabaseTestCase extends CIUnitTestCase
 {
-
 	/**
 	 * Should the db be refreshed before
 	 * each test?
@@ -57,26 +59,28 @@ class CIDatabaseTestCase extends CIUnitTestCase
 	protected $refresh = true;
 
 	/**
-	 * The name of the fixture used for all tests
-	 * within this test case.
+	 * The seed file(s) used for all tests within this test case.
+	 * Should be fully-namespaced or relative to $basePath
 	 *
-	 * @var string
+	 * @var string|array
 	 */
 	protected $seed = '';
 
 	/**
-	 * The path to where we can find the migrations
-	 * and seeds directories. Allows overriding
-	 * the default application directories.
+	 * The path to the seeds directory.
+	 * Allows overriding the default application directories.
 	 *
 	 * @var string
 	 */
-	protected $basePath = TESTPATH . '_support/Database';
+	protected $basePath = SUPPORTPATH . 'Database';
 
 	/**
-	 * The namespace to help us fird the migration classes.
+	 * The namespace(s) to help us find the migration classes.
+	 * Empty is equivalent to running `spark migrate -all`.
+	 * Note that running "all" runs migrations in date order,
+	 * but specifying namespaces runs them in namespace order (then date)
 	 *
-	 * @var string
+	 * @var string|array|null
 	 */
 	protected $namespace = 'Tests\Support';
 
@@ -119,18 +123,21 @@ class CIDatabaseTestCase extends CIUnitTestCase
 
 	//--------------------------------------------------------------------
 
+	/**
+	 * Load any database test dependencies.
+	 */
 	public function loadDependencies()
 	{
 		if ($this->db === null)
 		{
-			$this->db = \Config\Database::connect($this->DBGroup);
+			$this->db = Database::connect($this->DBGroup);
 			$this->db->initialize();
 		}
 
 		if ($this->migrations === null)
 		{
 			// Ensure that we can run migrations
-			$config          = new \Config\Migrations();
+			$config          = new Migrations();
 			$config->enabled = true;
 
 			$this->migrations = Services::migrations($config, $this->db);
@@ -139,7 +146,7 @@ class CIDatabaseTestCase extends CIUnitTestCase
 
 		if ($this->seeder === null)
 		{
-			$this->seeder = \Config\Database::seeder($this->DBGroup);
+			$this->seeder = Database::seeder($this->DBGroup);
 			$this->seeder->setSilent(true);
 		}
 	}
@@ -152,7 +159,7 @@ class CIDatabaseTestCase extends CIUnitTestCase
 	 *
 	 * @throws ConfigException
 	 */
-	protected function setUp()
+	protected function setUp(): void
 	{
 		parent::setUp();
 
@@ -160,41 +167,26 @@ class CIDatabaseTestCase extends CIUnitTestCase
 
 		if ($this->refresh === true)
 		{
-			if (! empty($this->namespace))
-			{
-				$this->migrations->setNamespace($this->namespace);
-			}
+			$this->regressDatabase();
 
-			// Delete all of the tables to ensure we're at a clean start.
-			$tables = $this->db->listTables();
-
-			if (is_array($tables))
-			{
-				$forge = \Config\Database::forge('tests');
-
-				foreach ($tables as $table)
-				{
-					if ($table === $this->db->DBPrefix . 'migrations')
-					{
-						continue;
-					}
-
-					$forge->dropTable($table, true);
-				}
-			}
-
-			$this->migrations->version(0, null, 'tests');
-			$this->migrations->latest(null, 'tests');
+			// Reset counts on faked items
+			Fabricator::resetCounts();
 		}
+
+		$this->migrateDatabase();
 
 		if (! empty($this->seed))
 		{
 			if (! empty($this->basePath))
 			{
-				$this->seeder->setPath(rtrim($this->basePath, '/') . '/seeds');
+				$this->seeder->setPath(rtrim($this->basePath, '/') . '/Seeds');
 			}
 
-			$this->seed($this->seed);
+			$seeds = is_array($this->seed) ? $this->seed : [$this->seed];
+			foreach ($seeds as $seed)
+			{
+				$this->seed($seed);
+			}
 		}
 	}
 
@@ -204,8 +196,10 @@ class CIDatabaseTestCase extends CIUnitTestCase
 	 * Takes care of any required cleanup after the test, like
 	 * removing any rows inserted via $this->hasInDatabase()
 	 */
-	public function tearDown()
+	protected function tearDown(): void
 	{
+		parent::tearDown();
+
 		if (! empty($this->insertCache))
 		{
 			foreach ($this->insertCache as $row)
@@ -220,6 +214,55 @@ class CIDatabaseTestCase extends CIUnitTestCase
 	//--------------------------------------------------------------------
 
 	/**
+	 * Regress migrations as defined by the class
+	 */
+	protected function regressDatabase()
+	{
+		// If no namespace was specified then rollback all
+		if (empty($this->namespace))
+		{
+			$this->migrations->setNamespace(null);
+			$this->migrations->regress(0, 'tests');
+		}
+
+		// Regress each specified namespace
+		else
+		{
+			$namespaces = is_array($this->namespace) ? $this->namespace : [$this->namespace];
+
+			foreach ($namespaces as $namespace)
+			{
+				$this->migrations->setNamespace($namespace);
+				$this->migrations->regress(0, 'tests');
+			}
+		}
+	}
+
+	/**
+	 * Run migrations as defined by the class
+	 */
+	protected function migrateDatabase()
+	{
+		// If no namespace was specified then migrate all
+		if (empty($this->namespace))
+		{
+			$this->migrations->setNamespace(null);
+			$this->migrations->latest('tests');
+		}
+		// Run migrations for each specified namespace
+		else
+		{
+			$namespaces = is_array($this->namespace) ? $this->namespace : [$this->namespace];
+
+			foreach ($namespaces as $namespace)
+			{
+				$this->migrations->setNamespace($namespace);
+				$this->migrations->latest('tests');
+			}
+		}
+	}
+
+	/**
 	 * Seeds that database with a specific seeder.
 	 *
 	 * @param string $name
@@ -229,7 +272,6 @@ class CIDatabaseTestCase extends CIUnitTestCase
 		return $this->seeder->call($name);
 	}
 
-	//--------------------------------------------------------------------
 	//--------------------------------------------------------------------
 	// Database Test Helpers
 	//--------------------------------------------------------------------

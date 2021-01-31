@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -63,6 +64,12 @@ class FileHandler implements CacheInterface
 
 	//--------------------------------------------------------------------
 
+	/**
+	 * Constructor.
+	 *
+	 * @param  \Config\Cache $config
+	 * @throws CacheException
+	 */
 	public function __construct($config)
 	{
 		$path = ! empty($config->storePath) ? $config->storePath : WRITEPATH . 'cache';
@@ -141,13 +148,13 @@ class FileHandler implements CacheInterface
 	 *
 	 * @param string $key Cache item name
 	 *
-	 * @return mixed
+	 * @return boolean
 	 */
 	public function delete(string $key)
 	{
 		$key = $this->prefix . $key;
 
-		return is_file($this->path . $key) ? unlink($this->path . $key) : false;
+		return is_file($this->path . $key) && unlink($this->path . $key);
 	}
 
 	//--------------------------------------------------------------------
@@ -221,7 +228,7 @@ class FileHandler implements CacheInterface
 	/**
 	 * Will delete all items in the entire cache.
 	 *
-	 * @return mixed
+	 * @return boolean
 	 */
 	public function clean()
 	{
@@ -315,7 +322,11 @@ class FileHandler implements CacheInterface
 
 		if ($data['ttl'] > 0 && time() > $data['time'] + $data['ttl'])
 		{
-			unlink($this->path . $key);
+			// If the file is still there then remove it
+			if (is_file($this->path . $key))
+			{
+				unlink($this->path . $key);
+			}
 
 			return false;
 		}
@@ -331,8 +342,8 @@ class FileHandler implements CacheInterface
 	/**
 	 * Writes a file to disk, or returns false if not successful.
 	 *
-	 * @param $path
-	 * @param $data
+	 * @param string $path
+	 * @param string $data
 	 * @param string $mode
 	 *
 	 * @return boolean
@@ -377,7 +388,7 @@ class FileHandler implements CacheInterface
 	 *
 	 * @return boolean
 	 */
-	protected function deleteFiles($path, $del_dir = false, $htdocs = false, $_level = 0)
+	protected function deleteFiles(string $path, bool $del_dir = false, bool $htdocs = false, int $_level = 0): bool
 	{
 		// Trim the trailing slash
 		$path = rtrim($path, '/\\');
@@ -423,7 +434,7 @@ class FileHandler implements CacheInterface
 	 *
 	 * @return array|false
 	 */
-	protected function getDirFileInfo($source_dir, $top_level_only = true, $_recursion = false)
+	protected function getDirFileInfo(string $source_dir, bool $top_level_only = true, bool $_recursion = false)
 	{
 		static $_filedata = [];
 		$relative_path    = $source_dir;
@@ -474,11 +485,16 @@ class FileHandler implements CacheInterface
 	 *
 	 * @return array|false
 	 */
-	protected function getFileInfo(string $file, array $returned_values = ['name', 'server_path', 'size', 'date'])
+	protected function getFileInfo(string $file, $returned_values = ['name', 'server_path', 'size', 'date'])
 	{
 		if (! is_file($file))
 		{
 			return false;
+		}
+
+		if (is_string($returned_values))
+		{
+			$returned_values = explode(',', $returned_values);
 		}
 
 		foreach ($returned_values as $key)
@@ -486,33 +502,33 @@ class FileHandler implements CacheInterface
 			switch ($key)
 			{
 				case 'name':
-					$fileinfo['name'] = basename($file);
+					$fileInfo['name'] = basename($file);
 					break;
 				case 'server_path':
-					$fileinfo['server_path'] = $file;
+					$fileInfo['server_path'] = $file;
 					break;
 				case 'size':
-					$fileinfo['size'] = filesize($file);
+					$fileInfo['size'] = filesize($file);
 					break;
 				case 'date':
-					$fileinfo['date'] = filemtime($file);
+					$fileInfo['date'] = filemtime($file);
 					break;
 				case 'readable':
-					$fileinfo['readable'] = is_readable($file);
+					$fileInfo['readable'] = is_readable($file);
 					break;
 				case 'writable':
-					$fileinfo['writable'] = is_writable($file);
+					$fileInfo['writable'] = is_writable($file);
 					break;
 				case 'executable':
-					$fileinfo['executable'] = is_executable($file);
+					$fileInfo['executable'] = is_executable($file);
 					break;
 				case 'fileperms':
-					$fileinfo['fileperms'] = fileperms($file);
+					$fileInfo['fileperms'] = fileperms($file);
 					break;
 			}
 		}
 
-		return $fileinfo;
+		return $fileInfo;
 	}
 
 	//--------------------------------------------------------------------

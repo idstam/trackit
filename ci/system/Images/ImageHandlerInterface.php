@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT    MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -51,6 +52,8 @@ interface ImageHandlerInterface
 	 * @param integer $height
 	 * @param boolean $maintainRatio If true, will get the closest match possible while keeping aspect ratio true.
 	 * @param string  $masterDim
+	 *
+	 * @return $this
 	 */
 	public function resize(int $width, int $height, bool $maintainRatio = false, string $masterDim = 'auto');
 
@@ -68,9 +71,21 @@ interface ImageHandlerInterface
 	 * @param boolean      $maintainRatio
 	 * @param string       $masterDim
 	 *
-	 * @return mixed
+	 * @return $this
 	 */
 	public function crop(int $width = null, int $height = null, int $x = null, int $y = null, bool $maintainRatio = false, string $masterDim = 'auto');
+
+	//--------------------------------------------------------------------
+
+	/**
+	 * Changes the stored image type to indicate the new file format to use when saving.
+	 * Does not touch the actual resource.
+	 *
+	 * @param integer|null $imageType A PHP imagetype constant, e.g. https://www.php.net/manual/en/function.image-type-to-mime-type.php
+	 *
+	 * @return $this
+	 */
+	public function convert(int $imageType);
 
 	//--------------------------------------------------------------------
 
@@ -79,7 +94,7 @@ interface ImageHandlerInterface
 	 *
 	 * @param float $angle
 	 *
-	 * @return mixed
+	 * @return $this
 	 */
 	public function rotate(float $angle);
 
@@ -92,9 +107,10 @@ interface ImageHandlerInterface
 	 * @param integer $green
 	 * @param integer $blue
 	 *
-	 * @return mixed
+	 * @return $this
 	 */
 	public function flatten(int $red = 255, int $green = 255, int $blue = 255);
+
 	//--------------------------------------------------------------------
 
 	/**
@@ -124,7 +140,7 @@ interface ImageHandlerInterface
 	 *
 	 * @param string $dir Direction to flip, either 'vertical' or 'horizontal'
 	 *
-	 * @return mixed
+	 * @return $this
 	 */
 	public function flip(string $dir = 'vertical');
 
@@ -148,7 +164,7 @@ interface ImageHandlerInterface
 	 * @param integer $height
 	 * @param string  $position
 	 *
-	 * @return boolean
+	 * @return $this
 	 */
 	public function fit(int $width, int $height, string $position);
 
@@ -188,7 +204,7 @@ interface ImageHandlerInterface
 	 * @param string  $target
 	 * @param integer $quality
 	 *
-	 * @return mixed
+	 * @return boolean
 	 */
 	public function save(string $target = null, int $quality = 90);
 }

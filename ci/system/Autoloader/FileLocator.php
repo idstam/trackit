@@ -8,6 +8,7 @@
  * This content is released under the MIT License (MIT)
  *
  * Copyright (c) 2014-2019 British Columbia Institute of Technology
+ * Copyright (c) 2019-2020 CodeIgniter Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,10 +30,10 @@
  *
  * @package    CodeIgniter
  * @author     CodeIgniter Dev Team
- * @copyright  2014-2019 British Columbia Institute of Technology (https://bcit.ca/)
+ * @copyright  2019-2020 CodeIgniter Foundation
  * @license    https://opensource.org/licenses/MIT	MIT License
  * @link       https://codeigniter.com
- * @since      Version 3.0.0
+ * @since      Version 4.0.0
  * @filesource
  */
 
@@ -49,6 +50,8 @@ namespace CodeIgniter\Autoloader;
 class FileLocator
 {
 	/**
+	 * The Autoloader to use.
+	 *
 	 * @var \CodeIgniter\Autoloader\Autoloader
 	 */
 	protected $autoloader;
@@ -104,7 +107,7 @@ class FileLocator
 			unset($segments[0]);
 		}
 
-		$path     = '';
+		$paths    = [];
 		$prefix   = '';
 		$filename = '';
 
@@ -113,31 +116,46 @@ class FileLocator
 
 		while (! empty($segments))
 		{
-			$prefix .= empty($prefix)
-				? ucfirst(array_shift($segments))
-				: '\\' . ucfirst(array_shift($segments));
+			$prefix .= empty($prefix) ? array_shift($segments) : '\\' . array_shift($segments);
 
 			if (empty($namespaces[$prefix]))
 			{
 				continue;
 			}
-			$path = $this->getNamespaces($prefix);
+			$paths = $namespaces[$prefix];
 
 			$filename = implode('/', $segments);
 			break;
 		}
 
-		// IF we have a folder name, then the calling function
-		// expects this file to be within that folder, like 'Views',
-		// or 'libraries'.
-		if (! empty($folder) && strpos($path . $filename, '/' . $folder . '/') === false)
+		// if no namespaces matched then quit
+		if (empty($paths))
 		{
-			$filename = $folder . '/' . $filename;
+			return false;
 		}
 
-		$path .= $filename;
+		// Check each path in the namespace
+		foreach ($paths as $path)
+		{
+			// Ensure trailing slash
+			$path = rtrim($path, '/') . '/';
 
-		return is_file($path) ? $path : false;
+			// If we have a folder name, then the calling function
+			// expects this file to be within that folder, like 'Views',
+			// or 'libraries'.
+			if (! empty($folder) && strpos($path . $filename, '/' . $folder . '/') === false)
+			{
+				$path .= trim($folder, '/') . '/';
+			}
+
+			$path .= $filename;
+			if (is_file($path))
+			{
+				return $path;
+			}
+		}
+
+		return false;
 	}
 
 	//--------------------------------------------------------------------
@@ -153,34 +171,38 @@ class FileLocator
 	{
 		$php        = file_get_contents($file);
 		$tokens     = token_get_all($php);
-		$count      = count($tokens);
 		$dlm        = false;
 		$namespace  = '';
 		$class_name = '';
 
-		for ($i = 2; $i < $count; $i++)
+		foreach ($tokens as $i => $token)
 		{
-			if ((isset($tokens[$i - 2][1]) && ($tokens[$i - 2][1] === 'phpnamespace' || $tokens[$i - 2][1] === 'namespace')) || ($dlm && $tokens[$i - 1][0] === T_NS_SEPARATOR && $tokens[$i][0] === T_STRING))
+			if ($i < 2)
+			{
+				continue;
+			}
+
+			if ((isset($tokens[$i - 2][1]) && ($tokens[$i - 2][1] === 'phpnamespace' || $tokens[$i - 2][1] === 'namespace')) || ($dlm && $tokens[$i - 1][0] === T_NS_SEPARATOR && $token[0] === T_STRING))
 			{
 				if (! $dlm)
 				{
 					$namespace = 0;
 				}
-				if (isset($tokens[$i][1]))
+				if (isset($token[1]))
 				{
-					$namespace = $namespace ? $namespace . '\\' . $tokens[$i][1] : $tokens[$i][1];
+					$namespace = $namespace ? $namespace . '\\' . $token[1] : $token[1];
 					$dlm       = true;
 				}
 			}
-			elseif ($dlm && ($tokens[$i][0] !== T_NS_SEPARATOR) && ($tokens[$i][0] !== T_STRING))
+			elseif ($dlm && ($token[0] !== T_NS_SEPARATOR) && ($token[0] !== T_STRING))
 			{
 				$dlm = false;
 			}
 			if (($tokens[$i - 2][0] === T_CLASS || (isset($tokens[$i - 2][1]) && $tokens[$i - 2][1] === 'phpclass'))
 				&& $tokens[$i - 1][0] === T_WHITESPACE
-				&& $tokens[$i][0] === T_STRING)
+				&& $token[0] === T_STRING)
 			{
-				$class_name = $tokens[$i][1];
+				$class_name = $token[1];
 				break;
 			}
 		}
@@ -208,23 +230,45 @@ class FileLocator
 	 *      'app/Modules/bar/Config/Routes.php',
 	 *  ]
 	 *
-	 * @param string $path
-	 * @param string $ext
+	 * @param string  $path
+	 * @param string  $ext
+	 * @param boolean $prioritizeApp
 	 *
 	 * @return array
 	 */
-	public function search(string $path, string $ext = 'php'): array
+	public function search(string $path, string $ext = 'php', bool $prioritizeApp = true): array
 	{
 		$path = $this->ensureExt($path, $ext);
 
 		$foundPaths = [];
+		$appPaths   = [];
 
 		foreach ($this->getNamespaces() as $namespace)
 		{
-			if (is_file($namespace['path'] . $path))
+			if (isset($namespace['path']) && is_file($namespace['path'] . $path))
 			{
-				$foundPaths[] = $namespace['path'] . $path;
+				$fullPath = $namespace['path'] . $path;
+				if ($prioritizeApp)
+				{
+					$foundPaths[] = $fullPath;
+				}
+				else
+				{
+					if (strpos($fullPath, APPPATH) === 0)
+					{
+						$appPaths[] = $fullPath;
+					}
+					else
+					{
+						$foundPaths[] = $fullPath;
+					}
+				}
 			}
+		}
+
+		if (! $prioritizeApp && ! empty($appPaths))
+		{
+			$foundPaths = array_merge($foundPaths, $appPaths);
 		}
 
 		// Remove any duplicates
@@ -261,33 +305,39 @@ class FileLocator
 	//--------------------------------------------------------------------
 
 	/**
-	 * @param string|null $prefix
+	 * Return the namespace mappings we know about.
 	 *
 	 * @return array|string
 	 */
-	protected function getNamespaces(string $prefix = null)
+	protected function getNamespaces()
 	{
-		if ($prefix)
-		{
-			$path = $this->autoloader->getNamespace($prefix);
-
-			return isset($path[0])
-				? rtrim($path[0], DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR
-				: '';
-		}
-
 		$namespaces = [];
+
+		// Save system for last
+		$system = [];
 
 		foreach ($this->autoloader->getNamespace() as $prefix => $paths)
 		{
 			foreach ($paths as $path)
 			{
+				if ($prefix === 'CodeIgniter')
+				{
+					$system = [
+						'prefix' => $prefix,
+						'path'   => rtrim($path, '\\/') . DIRECTORY_SEPARATOR,
+					];
+
+					continue;
+				}
+
 				$namespaces[] = [
 					'prefix' => $prefix,
-					'path'   => rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR,
+					'path'   => rtrim($path, '\\/') . DIRECTORY_SEPARATOR,
 				];
 			}
 		}
+
+		$namespaces[] = $system;
 
 		return $namespaces;
 	}
@@ -329,7 +379,11 @@ class FileLocator
 				// Remove the file extension (.php)
 				$className = mb_substr($className, 0, -4);
 
-				return $className;
+				// Check if this exists
+				if (class_exists($className))
+				{
+					return $className;
+				}
 			}
 		}
 
@@ -400,7 +454,7 @@ class FileLocator
 		// autoloader->getNamespace($prefix) returns an array of paths for that namespace
 		foreach ($this->autoloader->getNamespace($prefix) as $namespacePath)
 		{
-			$fullPath = realpath($namespacePath . $path);
+			$fullPath = realpath(rtrim($namespacePath, '/') . '/' . $path);
 
 			if (! is_dir($fullPath))
 			{
